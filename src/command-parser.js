@@ -24,7 +24,7 @@ function pickAction(text){if(/\b(turn|steer|rotate|pivot)\b|\b(?:left|right)\b/.
 export function parseTransmission(input,prior={}){
  const normalized=normalizeSpeech(input),frames=[],errors=[];
  let focusActor=prior.focusActor||null;
- const segments=normalized.split(/\s*(?:[;.!?]+)\s*|\s+and then\s+|\s+then\s+|\s+after that\s+|\s+while\s+/i).filter(Boolean);
+ const segments=normalized.split(/\s*(?:[;.!?]+)\s*|\s+and then\s+|\s+then\s+|\s+after that\s+|\s+while\s+|\s+and\s+(?=(?:driver|delta|gunner|beta|loader|gamma|silver|observer)\b)/i).filter(Boolean);
  for(let si=0;si<segments.length;si++){
   const section=segments[si];
   const mentions=[...section.matchAll(actorRx)];
@@ -35,12 +35,14 @@ export function parseTransmission(input,prior={}){
    const raw=atoms[ai].trim().replace(/^(?:and|to|please)\s+/,'');
    const action=pickAction(raw);
    if(!action){errors.push({code:'UNKNOWN_ACTION',clause:raw});continue;}
-   const actor=focusActor||({LOAD:'gamma',FIRE:'beta',ACQUIRE:'beta',REPORT:'silver',RESTART:'alpha'}[action]||null);
+   const expected={LOAD:'gamma',FIRE:'beta',ACQUIRE:'beta',REPORT:'silver',RESTART:'alpha',TURN:'delta',ADVANCE:'delta',REVERSE:'delta',HALT:'delta'};
+   const actor=lead?focusActor:(expected[action]||focusActor);
    if(!actor){errors.push({code:'MISSING_ACTOR',clause:raw});continue;}
    const direction=/(?<!\w)(left|right)(?!\w)/.exec(raw)?.[1]||null;
    const amount=action==='TURN'?degreesOf(raw):null;
    if(action==='TURN'&&!direction){errors.push({code:'MISSING_DIRECTION',clause:raw});continue;}
    if(amount!==null&&(amount<=0||amount>360)){errors.push({code:'INVALID_ANGLE',clause:raw});continue;}
+   if(actor!==expected[action]){errors.push({code:'WRONG_CREW',clause:raw,actor,expected:expected[action]});continue;}
    frames.push({kind:'ORDER',actor,action,direction,degrees:amount,ammo:/\b(ap|he|smoke)\b/.exec(raw)?.[1]||null,raw,relation:si===0&&ai===0?'FIRST':si>0?'AFTER':'CONCURRENT'});
   }
  }
