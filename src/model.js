@@ -40,7 +40,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -91,6 +91,7 @@ export function command(g,input){
  g.discourse=compiled.discourse;
  const receipts=[];
  for(const frame of compiled.frames){
+  if(frame.condition==='GUNNER_LOCKED'&&g.player.aimTime<=1.8){g.pendingFrames.push(frame);receipts.push('Delta: Holding conditional order until Beta reports locked.');continue;}
   const {actor,action,direction,degrees,ammo}=frame;
   let raw;
   if(action==='ADVANCE'||action==='REVERSE'||action==='HALT')raw=actor+' '+({ADVANCE:'advance',REVERSE:'reverse',HALT:'halt'}[action]);
@@ -127,6 +128,7 @@ export function step(g,dt){
   g.message=clear?(dmg?'Beta: HIT! '+(angle>55?'Side armor!':'Frontal armor!'):'Beta: Smoke away!'):'Beta: Shot blocked by terrain!';
   if(clear)e.hp-=dmg;g.loaded=null;g.loading=3.8;p.aimTime=0;e.alert=true;
  }
+ if(g.pendingFrames?.length&&p.aimTime>1.8){const ready=g.pendingFrames.filter(f=>f.condition==='GUNNER_LOCKED');g.pendingFrames=g.pendingFrames.filter(f=>f.condition!=='GUNNER_LOCKED');for(const frame of ready){if(frame.action==='HALT'){p.moving=0;p.turn=0;p.turnRemaining=0;g.message='Delta: Gunner locked. Halting as ordered.';}}}
  if(p.hp<=0){g.finished='Defeat';g.message='Silver: We are hit! Abandon tank!';}
  if(e.hp<=0){g.finished='Victory';g.message='Beta: Panzer knocked out! Target destroyed!';}
 }
