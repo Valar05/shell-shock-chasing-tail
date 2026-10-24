@@ -7,7 +7,7 @@ const cases=[
  ['driver advance and turn 20 degrees left',['ADVANCE','TURN']],
  ['driver, advance and turn twenty degrees left',['ADVANCE','TURN']],
  ['Delta advance; Delta turn right 10°',['ADVANCE','TURN']],
- ['Driver reverse, then turn 45 degrees right',['REVERSE','TURN']],
+ ['Driver reverse five meters, then turn 45 degrees right',['REVERSE','TURN']],
  ['driver advance and loader load AP then gunner fire',['ADVANCE','LOAD','FIRE']],
  ['Silver report; Delta advance; Gamma load HE; Beta acquire and fire',['REPORT','ADVANCE','LOAD','ACQUIRE','FIRE']],
 ];
