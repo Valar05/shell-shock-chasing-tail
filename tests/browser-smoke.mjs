@@ -36,6 +36,10 @@ try{
  if(!(await phone.locator('#mic').isVisible()))throw Error('Mobile microphone toggle absent');
  const boundsMobile=await phone.locator('#mic').boundingBox();
  if(!boundsMobile||boundsMobile.y<0||boundsMobile.y+boundsMobile.height>412||boundsMobile.x+boundsMobile.width>915)throw Error('Mobile microphone outside viewport');
+ const canvasBounds=await phone.locator('#battle-canvas').boundingBox();
+ if(!canvasBounds||canvasBounds.width>916||canvasBounds.height>413||canvasBounds.x<-.5||canvasBounds.y<-.5)throw Error('Canvas displayed larger than mobile viewport: '+JSON.stringify(canvasBounds));
+ const pixels=await phone.locator('#battle-canvas').evaluate(el=>{const c=el.getContext('2d'),w=el.width,h=el.height;const points=[[w*.5,h*.63],[w*.5,h*.2],[w*.6,h*.5]].map(([x,y])=>Array.from(c.getImageData(Math.floor(x),Math.floor(y),1,1).data).slice(0,3));return {w,h,points};});
+ if(pixels.points.every(p=>p[0]===121&&p[1]===132&&p[2]===96))throw Error('World is featureless green: '+JSON.stringify(pixels));
  await phone.screenshot({path:'artifacts/mobile-landscape.png'});
  await phone.close();
 await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
