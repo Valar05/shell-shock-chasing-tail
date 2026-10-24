@@ -18,8 +18,12 @@ jobs:
       - run: npm install --no-audit --no-fund
       - run: npm test
       - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: node tests/browser-smoke.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: shell-shock-web-build
-          path: dist/
+          path: |
+            dist/
+            artifacts/
           if-no-files-found: error
