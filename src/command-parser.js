@@ -33,7 +33,7 @@ const vocabulary=[
   ["FIRE",/\b(fire|shoot|send a round)\b/],
   ["ACQUIRE",/\b(acquire|track|engage|lay on|lock on)\b/],
   ["REPORT",/\b(report|status|sitrep|scan|look|what do you see|what can you see)\b/],
-  ["ADVANCE",/\b(advance|proceed|drive|move|push|forward|continue|keep moving|go forward|go ahead|take us|bring us)\b/]
+  ["ADVANCE",/\b(advance|proceed|drive|move|push|forward|ahead|continue|keep moving|go forward|go ahead|take us|bring us)\b/]
 ];
 
 export function normalizeSpeech(input){
@@ -134,7 +134,7 @@ function directionOf(raw){
 function bearingOf(raw){
   const clock=raw.match(/\b(1[0-2]|[1-9])\s*(?:o\s*'?\s*clock|oclock)\b/);
   if(clock)return {type:"CLOCK",value:Number(clock[1])};
-  const degrees=raw.match(/\b(?:bearing|azimuth|heading|turn to|turn us to|align to|face)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
+  const degrees=raw.match(/\b(?:bearing|azimuth|heading|turn to|turn us to|align to|align us to|face)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
   if(degrees)return {type:"ABSOLUTE",value:Number(degrees[1])};
   const spoken=raw.match(/\b(?:bearing|azimuth|heading|turn to|turn us to|align to|face)\s+((?:[a-z]+(?:\s+and)?\s*){1,5})(?:degrees?|deg)?\s*$/);
   if(spoken){const value=numeric(spoken[1]);if(value!==null)return {type:"ABSOLUTE",value};}
@@ -169,9 +169,10 @@ export function parseTransmission(input,prior={}){
   const atoms=splitActions(text);
   const stageDependencies=section.relation==='AFTER'&&frames.length?[{type:'AFTER_FRAME',frame:frames.length-1}]:[];
   for(let j=0;j<atoms.length;j++){
-   const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").trim();
+   const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").replace(/\s+(?:and|then)\s*$/,"").trim();
    const {main,condition,error}=conditionFrom(raw);
    if(error){errors.push({...error,clause:raw});continue;}
+   if(/\band\s+(?!slowly\b|carefully\b|cautiously\b|quietly\b|steadily\b)/.test(main)){errors.push({code:"UNPARSED_CONJUNCTION",clause:raw});continue;}
    const action=classify(main);
    if(!action){errors.push({code:"UNKNOWN_ACTION",clause:raw});continue;}
    const actor=lead?focusActor:ROLES[action]||focusActor;
@@ -189,7 +190,9 @@ export function parseTransmission(input,prior={}){
    if(["TURN","TRAVERSE"].includes(action)&&/\b(left|port)\b/.test(main)&&/\b(right|starboard)\b/.test(main)){errors.push({code:"CONTRADICTORY_DIRECTIONS",clause:raw});continue;}
    if(["TURN","TRAVERSE","HEADING"].includes(action)&&/\b(?:meters?|metres?|yards?|feet|foot)\b/.test(main)){errors.push({code:"INVALID_UNIT",clause:raw});continue;}
    if(["ADVANCE","REVERSE"].includes(action)&&/\b(?:degrees?|deg)\b/.test(main)){errors.push({code:"INVALID_UNIT",clause:raw});continue;}
-   if(/\b-\d+\b/.test(main)){errors.push({code:"NEGATIVE_QUANTITY",clause:raw});continue;}
+   if(/-\d+(?:\.\d+)?/.test(main)){errors.push({code:"NEGATIVE_QUANTITY",clause:raw});continue;}
+   if(action==="LOAD"&&/\b(?:ap|armor.piercing|armour.piercing)\b/.test(main)&&/\b(?:he|high.explosive|smoke)\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
+   if(action==="LOAD"&&/\b(?:he|high.explosive)\b/.test(main)&&/\bsmoke\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
    if(degrees!==null&&(degrees<=0||degrees>360)){errors.push({code:"INVALID_ANGLE",clause:raw});continue;}
    if(distance!==null&&(distance<=0||distance>2000)){errors.push({code:"INVALID_DISTANCE",clause:raw});continue;}
    if(["SPOT","HEADING"].includes(action)&&!bearing){errors.push({code:"MISSING_BEARING",clause:raw});continue;}
