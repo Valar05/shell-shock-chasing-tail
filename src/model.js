@@ -23,7 +23,7 @@ export function move(tank,speed,dt){const rad=tank.hull*Math.PI/180;const x=tank
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
  return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,
- player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,aim:null,aimError:0,aimTime:0,shotCount:0},
+ player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
 export function designate(g){const p=g.player,e=g.enemy;const b=bearing(p,e);if(Math.abs(diff(g.view,b))>14||blocked(p,e))return false;g.enemySeen=true;p.aim='enemy';p.aimTime=0;return true;}
@@ -31,10 +31,10 @@ export function command(g,input){
  const c=input.toLowerCase().replace(/[.,!?]/g,'').trim();const p=g.player;
  if(/\b(restart|retry)\b/.test(c))return 'Restart with the Restart button.';
  if(/\b(delta|driver)\b/.test(c)){
-  if(/\b(halt|stop)\b/.test(c)){p.moving=0;p.turn=0;return 'Delta: Halted, sir.';}
+  if(/\b(halt|stop)\b/.test(c)){p.moving=0;p.turn=0;p.turnRemaining=0;return 'Delta: Halted, sir.';}
   if(/\b(reverse|back)\b/.test(c)){p.moving=-9;return 'Delta: Reversing.';}
   if(/\b(advance|forward|move)\b/.test(c)){p.moving=11;return 'Delta: Advancing.';}
-  const d=c.match(/\b(left|right)\b/);if(d){p.turn=d[1]==='left'?-22:22;return 'Delta: Turning '+d[1]+'.';}
+  const d=c.match(/\b(left|right)\b/);if(d){const magnitude=c.match(/\b(\d+(?:\.\d+)?)\s*(?:degrees?|deg)?\b/);const degrees=magnitude?Number(magnitude[1]):null;if(degrees!==null&&(!Number.isFinite(degrees)||degrees<=0||degrees>360))return 'Delta: Specify a turn from 1 to 360 degrees.';p.turn=d[1]==='left'?-22:22;p.turnRemaining=degrees;return 'Delta: Turning '+d[1]+(degrees===null?' until ordered to halt.':' '+degrees+' degrees.');}
  }
  if(/\b(gamma|loader)\b/.test(c)||/\bload\b/.test(c)){
   const m=c.match(/\b(ap|he|smoke)\b/);if(m)g.selected=m[1].toUpperCase();if(!g.loaded&&g.loading<=0)g.loading=3.8;return 'Gamma: '+g.selected+' selected; '+(g.loaded?g.loaded+' already in breech.':'loading.');
@@ -50,7 +50,7 @@ export function command(g,input){
 }
 export function step(g,dt){
  if(g.finished)return;dt=Math.min(dt,.08);g.elapsed+=dt;const p=g.player,e=g.enemy;
- if(p.turn){p.hull=norm(p.hull+p.turn*dt);p.turret=norm(p.turret+p.turn*dt);g.view=norm(g.view+p.turn*dt);}
+ if(p.turn){const delta=p.turnRemaining===null?p.turn*dt:Math.sign(p.turn)*Math.min(Math.abs(p.turn*dt),p.turnRemaining);p.hull=norm(p.hull+delta);p.turret=norm(p.turret+delta);g.view=norm(g.view+delta);if(p.turnRemaining!==null){p.turnRemaining=Math.max(0,p.turnRemaining-Math.abs(delta));if(p.turnRemaining<.00001){p.turn=0;p.turnRemaining=0;g.message='Delta: Turn complete. Holding heading.';}}}
  if(p.moving)move(p,p.moving,dt);
  if(g.loading>0){g.loading-=dt;if(g.loading<=0){g.loaded=g.selected;g.message='Gamma: '+g.loaded+' loaded.';}}
  if(!g.enemySeen&&!blocked(p,e)&&Math.abs(diff(g.view,bearing(p,e)))<13){g.enemySeen=true;g.message='Silver: Enemy Panzer! Bearing '+Math.round(bearing(p,e))+'!';}
