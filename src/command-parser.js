@@ -172,7 +172,6 @@ export function parseTransmission(input,prior={}){
    const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").replace(/\s+(?:and|then)\s*$/,"").trim();
    const {main,condition,error}=conditionFrom(raw);
    if(error){errors.push({...error,clause:raw});continue;}
-   if(/\band\s+(?!slowly\b|carefully\b|cautiously\b|quietly\b|steadily\b)/.test(main)){errors.push({code:"UNPARSED_CONJUNCTION",clause:raw});continue;}
    const action=classify(main);
    if(!action){errors.push({code:"UNKNOWN_ACTION",clause:raw});continue;}
    const actor=lead?focusActor:ROLES[action]||focusActor;
@@ -193,6 +192,7 @@ export function parseTransmission(input,prior={}){
    if(/-\d+(?:\.\d+)?/.test(main)){errors.push({code:"NEGATIVE_QUANTITY",clause:raw});continue;}
    if(action==="LOAD"&&/\b(?:ap|armor.piercing|armour.piercing)\b/.test(main)&&/\b(?:he|high.explosive|smoke)\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
    if(action==="LOAD"&&/\b(?:he|high.explosive)\b/.test(main)&&/\bsmoke\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
+   if(/\band\s+(?!slowly\b|carefully\b|cautiously\b|quietly\b|steadily\b)/.test(main)){errors.push({code:"UNPARSED_CONJUNCTION",clause:raw});continue;}
    if(degrees!==null&&(degrees<=0||degrees>360)){errors.push({code:"INVALID_ANGLE",clause:raw});continue;}
    if(distance!==null&&(distance<=0||distance>2000)){errors.push({code:"INVALID_DISTANCE",clause:raw});continue;}
    if(["SPOT","HEADING"].includes(action)&&!bearing){errors.push({code:"MISSING_BEARING",clause:raw});continue;}
