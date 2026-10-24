@@ -28,7 +28,7 @@ const vocabulary=[
   ["HALT",/\b(halt|stop|brake|hold position)\b/],
   ["REVERSE",/\b(reverse|back(?:ward|wards)?|back up|pull back)\b/],
   ["TURN",/\b(turn|steer|rotate|pivot|swing)\b/],
-  ["LOAD",/\b(load|reload|chamber|select|armor.piercing|armour.piercing|high.explosive)\b/],
+  ["LOAD",/\b(load|reload|chamber|select|armor.piercing|armour.piercing|high.explosive|ap|he|smoke)\b/],
   ["FIRE",/\b(fire|shoot|send a round)\b/],
   ["ACQUIRE",/\b(acquire|track|engage|lay on|lock on)\b/],
   ["REPORT",/\b(report|status|sitrep|scan|look|what do you see|what can you see)\b/],
@@ -166,7 +166,7 @@ export function parseTransmission(input,prior={}){
    if(!action){errors.push({code:"UNKNOWN_ACTION",clause:raw});continue;}
    const actor=lead?focusActor:ROLES[action]||focusActor;
    if(!actor){errors.push({code:"MISSING_ACTOR",clause:raw});continue;}
-   if(actor!==ROLES[action]){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
+   if(actor!==ROLES[action]&&!(action==="SPOT"&&["alpha","beta","silver"].includes(actor))){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
    const direction=directionOf(main);
    const degrees=["TURN","TRAVERSE"].includes(action)?parseAmount(main,"angle"):null;
    const distance=["ADVANCE","REVERSE"].includes(action)?parseAmount(main,"distance"):null;
