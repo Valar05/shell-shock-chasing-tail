@@ -81,6 +81,7 @@ function legacyCommand(g,input){
 
 // Compile first, then apply all valid frames in order. No silently discarded half-orders.
 export function command(g,input){
+ const designation=/\b(?:bearing|o'?clock|enemy to|contact at|target at)\b/i.test(input);if(designation)return legacyCommand(g,input);
  const compiled=parseTransmission(input,g.discourse||{});
  if(!compiled.ok){
   // Preserve legacy directional designation and range language until its frame migration.
