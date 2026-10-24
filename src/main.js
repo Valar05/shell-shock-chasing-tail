@@ -1,31 +1,43 @@
-import * as THREE from 'three';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
 import './style.css';
 const root=document.querySelector('#app');
 root.innerHTML=`<div id="viewport"></div><div id="hud"><div id="title">SHELL SHOCK <small>CHASING TAIL · ORCHARD CONTACT</small></div><div id="bearings"></div><div id="compass" aria-label="Compass and viewing bearing"><div id="compass-ticks"></div><div id="compass-center">▼</div></div><div id="status"></div><div id="message"></div><div id="end-screen" hidden role="alertdialog" aria-live="assertive"><strong id="end-title"></strong><p id="end-caption"></p><button id="end-restart" type="button">↻ Play again</button></div><div id="orders"><div id="voice-panel"><button id="mic" type="button" aria-pressed="false">🎙️ Start voice command</button><span id="voice-state" role="status" aria-live="polite">Tap microphone and speak to your crew</span></div><details id="type-fallback"><summary>Keyboard commands (alternative)</summary><form id="form"><input id="order" placeholder="Command your crew…" autocomplete="off" aria-label="Command your crew"/><button>Issue order</button></form></details><div id="shortcuts"><button data-order="Silver report">Report</button><button data-order="Delta advance">Advance</button><button data-order="Delta halt">Halt</button><button data-order="Delta reverse">Reverse</button><button data-order="Delta left">Turn left</button><button data-order="Delta right">Turn right</button><button data-order="Beta acquire">Acquire</button><button data-order="Gamma load AP">Load AP</button><button data-order="Beta fire">Fire</button><button id="restart" type="button">Restart</button></div></div></div>`;
-const viewport=document.querySelector('#viewport');const scene=new THREE.Scene();scene.background=new THREE.Color(0x9eafa5);scene.fog=new THREE.Fog(0x9eafa5,90,310);
-const camera=new THREE.PerspectiveCamera(50,1,.1,390);const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));viewport.append(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdde7dc,0x666341,2));
-const sunlight=new THREE.DirectionalLight(0xffe0b0,2);sunlight.position.set(-50,80,100);scene.add(sunlight);
-const material=(color)=>new THREE.MeshLambertMaterial({color});
-const groundGeometry=new THREE.PlaneGeometry(420,310,64,48);groundGeometry.rotateX(-Math.PI/2);
-const pos=groundGeometry.attributes.position;for(let i=0;i<pos.count;i++)pos.setY(i,terrainHeight(pos.getX(i),pos.getZ(i)+120)-.5);groundGeometry.computeVertexNormals();
-const ground=new THREE.Mesh(groundGeometry,material(0x76815a));ground.position.z=120;scene.add(ground);
-function box(x,z,w,d,h,color){const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),material(color));m.position.set(x,terrainHeight(x,z)+h/2,z);scene.add(m);return m;}
-for(const o of obstacles){box(o.x,o.z,o.w,o.d,o.h,o.type==='hedge'?0x405f35:0x98876e);if(o.type==='house'){const roof=new THREE.Mesh(new THREE.ConeGeometry(23,9,4),material(0x875743));roof.rotation.y=Math.PI/4;roof.position.set(o.x,terrainHeight(o.x,o.z)+o.h+3,o.z);scene.add(roof);}}
-for(let i=0;i<55;i++){const x=Math.sin(i*54.32)*179,z=(i*47)%257;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+10&&Math.abs(z-o.z)<o.d/2+10))continue;const trunk=box(x,z,1.5,1.5,5,0x64533b);const leaves=new THREE.Mesh(new THREE.SphereGeometry(4.5,5,4),material(0x456943));leaves.position.set(x,terrainHeight(x,z)+7.8,z);scene.add(leaves);}
-const road=new THREE.Mesh(new THREE.PlaneGeometry(15,260),new THREE.MeshLambertMaterial({color:0xada17c,side:THREE.DoubleSide}));road.rotation.x=-Math.PI/2;road.position.set(15,.3,120);scene.add(road);
-function tank(color){const group=new THREE.Group();const chassis=new THREE.Mesh(new THREE.BoxGeometry(8,3,12),material(color));chassis.position.y=2.5;group.add(chassis);for(const x of [-4.8,4.8]){const tread=new THREE.Mesh(new THREE.BoxGeometry(2,2.3,12),material(0x292e2a));tread.position.set(x,1.5,0);group.add(tread);}
-const turretPivot=new THREE.Group();turretPivot.position.y=4;const tur=new THREE.Mesh(new THREE.CylinderGeometry(3.5,3.5,2,7),material(color));tur.position.y=.5;turretPivot.add(tur);
-const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,10,7),material(0x424642));barrel.rotation.x=Math.PI/2;barrel.position.set(0,.4,6);turretPivot.add(barrel);group.add(turretPivot);scene.add(group);return{group,turretPivot};}
-const enemyArt=tank(0x6e6c59);let g=makeGame(1);
-function updateArt(){const e=g.enemy;enemyArt.group.position.set(e.x,terrainHeight(e.x,e.z),e.z);enemyArt.group.rotation.y=e.hull*Math.PI/180;enemyArt.turretPivot.rotation.y=diff(e.turret,e.hull)*Math.PI/180;enemyArt.group.visible=e.hp>0;}
+const viewport=document.querySelector('#viewport');
+const canvas=document.createElement('canvas');canvas.id='battle-canvas';canvas.setAttribute('aria-label','Vector tactical world view');viewport.append(canvas);
+const ctx=canvas.getContext('2d',{alpha:false});
+let g=makeGame(1);
+const scale=2.25;
+function point(x,z){const dx=x-g.player.x,dz=z-g.player.z,r=g.view*Math.PI/180;
+ return [canvas.clientWidth/2+(dx*Math.cos(r)-dz*Math.sin(r))*scale,canvas.clientHeight*.63-(dx*Math.sin(r)+dz*Math.cos(r))*scale];}
+function poly(points,color,stroke='#1d2e21'){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}
+function rectangle(x,z,w,d,color){poly([[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]].map(p=>point(...p)),color);}
+function tankArt(t,color){
+ const r=t.hull*Math.PI/180,ca=Math.cos(r),si=Math.sin(r);
+ const hull=[[-5,-6],[5,-6],[5,6],[-5,6]].map(([x,z])=>point(t.x+x*ca+z*si,t.z-x*si+z*ca));
+ poly(hull,color);const center=point(t.x,t.z);
+ ctx.beginPath();ctx.arc(...center,7,0,Math.PI*2);ctx.fillStyle='#474e42';ctx.fill();
+ const gunR=t.turret*Math.PI/180,tip=point(t.x+Math.sin(gunR)*12,t.z+Math.cos(gunR)*12);
+ ctx.beginPath();ctx.moveTo(...center);ctx.lineTo(...tip);ctx.strokeStyle='#e4dfc6';ctx.lineWidth=5;ctx.stroke();
+}
+function drawWorld(){
+ const w=canvas.clientWidth,h=canvas.clientHeight;ctx.fillStyle='#798460';ctx.fillRect(0,0,w,h);
+ const p=g.player;
+ for(let x=-200;x<=200;x+=25){const a=point(x,-25),b=point(x,260);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.lineWidth=1;ctx.stroke();}
+ for(let z=0;z<=250;z+=25){const a=point(-205,z),b=point(205,z);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.stroke();}
+ rectangle(15,120,15,260,'#ac9d7c');
+ for(const o of obstacles)rectangle(o.x,o.z,o.w,o.d,o.type==='hedge'?'#334e2b':'#8a6756');
+ if(g.enemy.hp>0)tankArt(g.enemy,'#76674e');
+ tankArt(p,'#d2c292');
+ const [cx,cy]=point(p.x,p.z);
+ ctx.beginPath();ctx.moveTo(cx,cy);const sight=point(p.x+Math.sin(g.view*Math.PI/180)*65,p.z+Math.cos(g.view*Math.PI/180)*65);ctx.lineTo(...sight);ctx.strokeStyle='#fbe49b80';ctx.lineWidth=1;ctx.stroke();
+ ctx.fillStyle='#f5efda';ctx.font='12px system-ui';ctx.fillText('VECTOR PROTOTYPE · HEDGES SLOW TRACKS',12,h-14);
+}
 const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
-function size(){const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
+function size(){const w=viewport.clientWidth,h=viewport.clientHeight;const ratio=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);}addEventListener('resize',size);size();
 let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
-renderer.domElement.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;renderer.domElement.setPointerCapture(ev.pointerId)});
-renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
-renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
+canvas.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;canvas.setPointerCapture(ev.pointerId)});
+canvas.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
+canvas.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
 const ui=document.querySelector('#message');
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){restartGame();return;}g.message=command(g,s);renderHud();}
@@ -56,7 +68,4 @@ function renderCompass(){const width=document.querySelector('#compass').clientWi
 function renderHud(){renderCompass();document.querySelector('#bearings').textContent='HULL '+Math.round(g.player.hull).toString().padStart(3,'0')+'°  |  VIEW '+Math.round(g.view).toString().padStart(3,'0')+'°  |  GUN '+Math.round(g.player.turret).toString().padStart(3,'0')+'°';
  document.querySelector('#status').textContent='ARMOR '+Math.max(0,Math.round(g.player.hp))+'% · GUN '+(g.loaded||'EMPTY')+' · '+(g.player.aimTime>1.8?'LAID':'ACQUIRING')+' · '+(g.enemySeen?'PANZER CONTACT':'NO CONTACT')+(g.finished?' · '+g.finished.toUpperCase():'');
  ui.textContent=g.message;const end=document.querySelector('#end-screen');if(g.finished){end.hidden=false;document.querySelector('#end-title').textContent=g.finished==='Victory'?'Victory · Enemy destroyed':'Defeat · Tank knocked out';document.querySelector('#end-caption').textContent=g.message;}else end.hidden=true;}
-let last=performance.now(),hud=0;function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.06);last=now;step(g,dt);updateArt();
- const p=g.player;camera.position.set(p.x,terrainHeight(p.x,p.z)+5.7,p.z);
- const rad=g.view*Math.PI/180;camera.lookAt(p.x+Math.sin(rad)*100,camera.position.y+Math.tan(pitch*Math.PI/180)*100,p.z+Math.cos(rad)*100);
- renderer.render(scene,camera);hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
+let last=performance.now(),hud=0;function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.06);last=now;step(g,dt);drawWorld();hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
