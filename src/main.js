@@ -21,7 +21,7 @@ const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,10,7),material(0x
 const enemyArt=tank(0x6e6c59);let g=makeGame(1);
 function updateArt(){const e=g.enemy;enemyArt.group.position.set(e.x,terrainHeight(e.x,e.z),e.z);enemyArt.group.rotation.y=e.hull*Math.PI/180;enemyArt.turretPivot.rotation.y=diff(e.turret,e.hull)*Math.PI/180;enemyArt.group.visible=e.hp>0;}
 const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
-function size(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
+function size(){const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
 let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
 renderer.domElement.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;renderer.domElement.setPointerCapture(ev.pointerId)});
 renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
@@ -29,15 +29,22 @@ renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs
 const ui=document.querySelector('#message');
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){g=makeGame(g.seed+1);pitch=0;renderHud();return;}g.message=command(g,s);renderHud();}
 const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voice-state');
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;let recognition=null,listening=false,wantListening=false;
-function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Stop listening':'🎙️ Start voice command';voiceState.textContent=message;}
-if(SpeechRecognition){recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
- recognition.onstart=()=>{listening=true;updateVoice('Listening for crew orders…');};
- recognition.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const transcript=ev.results[i][0]?.transcript?.trim()||'';if(ev.results[i].isFinal){if(transcript){issue(transcript);updateVoice('Heard: '+transcript);}}else interim=transcript;}if(interim)voiceState.textContent='Hearing: '+interim;};
- recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error))wantListening=false;updateVoice('Microphone: '+ev.error+'. Tap to retry or use keyboard.');};
- recognition.onend=()=>{listening=false;if(wantListening){try{recognition.start();}catch{wantListening=false;updateVoice('Recognition stopped; tap microphone to retry.');}}else updateVoice('Microphone off. Tap to speak.');};
- mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){updateVoice('Starting microphone…');if(!listening)try{recognition.start();}catch{wantListening=false;updateVoice('Could not start microphone. Try again.');}}else{updateVoice('Stopping microphone…');recognition.stop();}});
-}else{mic.disabled=true;updateVoice('This browser does not provide speech recognition. Use a supported browser or keyboard fallback.');}
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+let recognition=null,listening=false,wantListening=false,phrase='',silenceTimer=null,restartTimer=null;
+const SILENCE_MS=3000;
+function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
+function cancelSilence(){if(silenceTimer!==null){clearTimeout(silenceTimer);silenceTimer=null;}}
+function commitPhrase(){cancelSilence();const spoken=phrase.trim();phrase='';if(spoken){issue(spoken);updateVoice('Sent: '+spoken);}}
+function holdPhrase(text){phrase=text.trim();cancelSilence();if(!phrase)return;voiceState.textContent='Heard: '+phrase+' · sending after 3 seconds of quiet';silenceTimer=setTimeout(commitPhrase,SILENCE_MS);}
+function retryListening(){if(!wantListening||listening)return;clearTimeout(restartTimer);restartTimer=setTimeout(()=>{if(!wantListening||listening)return;try{recognition.start();}catch{updateVoice('Microphone paused. Tap OFF then ON to retry.');}},300);}
+if(SpeechRecognition){
+ recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
+ recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
+ recognition.onresult=ev=>{let assembled='';for(let i=ev.resultIndex;i<ev.results.length;i++){const t=ev.results[i][0]?.transcript?.trim()||'';if(t)assembled+=(assembled?' ':'')+t;}if(assembled)holdPhrase(assembled);};
+ recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;cancelSilence();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
+ recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
+ mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){phrase='';updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);commitPhrase();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
+}else{mic.disabled=true;updateVoice('Speech recognition unavailable in this browser. Try Chrome or keyboard fallback.');}
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
 document.querySelector('#restart').addEventListener('click',()=>{g=makeGame(g.seed+1);pitch=0;renderHud()});
