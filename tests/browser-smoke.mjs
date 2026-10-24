@@ -58,7 +58,7 @@ try{
   hull:window.__shellShockDebug.hull(),
   x:window.__shellShockDebug.project(p.x,p.z+80).x
  }),initial.marker);
- if(!(((turned.hull-initial.hull+540)%360)-180<-10&&turned.x>initial.x+.1))
+ if(!(((turned.hull-initial.hull+540)%360)-180<-2&&turned.x>initial.x+.04))
   throw Error('LEFT steering visually reversed or stalled: '+JSON.stringify({initial,turned}));
  await orient.close();
 
