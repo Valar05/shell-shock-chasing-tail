@@ -62,10 +62,11 @@ function numeric(s){
   return total+active;
 }
 export function parseAmount(raw,kind){
-  const segment=raw.match(kind==="distance"?/\b((?:\d+(?:\.\d+)?|[\w -]+))\s*(?:meters?|metres?|yards?)\b/:
-    /\b((?:\d+(?:\.\d+)?|[\w -]+))\s*(?:degrees?|deg)\b/);
-  if(segment)return numeric(segment[1]);
-  // Bare number after a direction is an angle, not a tank movement distance.
+  const units=kind==="distance"?/(?:meters?|metres?|yards?|feet|foot)\b/:/(?:degrees?|deg)\b/;
+  const matched=raw.match(kind==="distance"?/\b((?:\d+(?:\.\d+)?|[\w -]+))\s*(meters?|metres?|yards?|feet|foot)\b/:
+    /\b((?:\d+(?:\.\d+)?|[\w -]+))\s*(degrees?|deg)\b/);
+  if(matched){const n=numeric(matched[1]);if(n===null)return null;
+    return kind==="distance"?(matched[2].startsWith("yard")?n*.9144:matched[2].startsWith("f")?n*.3048:n):n;}
   if(kind==="angle")return numeric(raw);
   return null;
 }
@@ -103,6 +104,7 @@ function splitActions(section){
   return out;
 }
 function classify(raw){
+  if(/\b(?:turn|steer|rotate|pivot)\s+(?:us\s+)?(?:to|towards?|onto)\s+(?:bearing|azimuth|heading|north|south|east|west|\d)/.test(raw))return "HEADING";
   const found=vocabulary.filter(([,rx])=>rx.test(raw)).map(([action])=>action);
   if(!found.length){
     if(/\b(left|right)\b/.test(raw))return "TURN";
@@ -131,8 +133,10 @@ function directionOf(raw){
 function bearingOf(raw){
   const clock=raw.match(/\b(1[0-2]|[1-9])\s*(?:o\s*'?\s*clock|oclock)\b/);
   if(clock)return {type:"CLOCK",value:Number(clock[1])};
-  const degrees=raw.match(/\b(?:bearing|azimuth|heading)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
+  const degrees=raw.match(/\b(?:bearing|azimuth|heading|turn to|turn us to|align to|face)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
   if(degrees)return {type:"ABSOLUTE",value:Number(degrees[1])};
+  const spoken=raw.match(/\b(?:bearing|azimuth|heading|turn to|turn us to|align to|face)\s+((?:[a-z]+(?:\s+and)?\s*){1,5})(?:degrees?|deg)?\s*$/);
+  if(spoken){const value=numeric(spoken[1]);if(value!==null)return {type:"ABSOLUTE",value};}
   const cardinal=raw.match(/\b(north(?:east|west)?|south(?:east|west)?|east|west)\b/);
   if(cardinal)return {type:"CARDINAL",value:cardinal[1]};
   const relative=raw.match(/\b(ahead|front|forward|left|right|port|starboard|behind|rear)\b/);
@@ -177,6 +181,10 @@ export function parseTransmission(input,prior={}){
    const bearing=["SPOT","HEADING"].includes(action)?bearingOf(main):null;
    const ammo=action==="LOAD"?ammoOf(main):null;
    if(["TURN","TRAVERSE"].includes(action)&&!direction){errors.push({code:"MISSING_DIRECTION",clause:raw});continue;}
+   if(["TURN","TRAVERSE"].includes(action)&&/\b(left|port)\b/.test(main)&&/\b(right|starboard)\b/.test(main)){errors.push({code:"CONTRADICTORY_DIRECTIONS",clause:raw});continue;}
+   if(["TURN","TRAVERSE","HEADING"].includes(action)&&/\b(?:meters?|metres?|yards?|feet|foot)\b/.test(main)){errors.push({code:"INVALID_UNIT",clause:raw});continue;}
+   if(["ADVANCE","REVERSE"].includes(action)&&/\b(?:degrees?|deg)\b/.test(main)){errors.push({code:"INVALID_UNIT",clause:raw});continue;}
+   if(/\b-\d+\b/.test(main)){errors.push({code:"NEGATIVE_QUANTITY",clause:raw});continue;}
    if(degrees!==null&&(degrees<=0||degrees>360)){errors.push({code:"INVALID_ANGLE",clause:raw});continue;}
    if(distance!==null&&(distance<=0||distance>2000)){errors.push({code:"INVALID_DISTANCE",clause:raw});continue;}
    if(["SPOT","HEADING"].includes(action)&&!bearing){errors.push({code:"MISSING_BEARING",clause:raw});continue;}
@@ -187,6 +195,14 @@ export function parseTransmission(input,prior={}){
    frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,condition,relation,
     dependencies:relation==="AFTER"?[{type:"AFTER_FRAME",frame:index-1}]:[],raw});
   }
+ }
+ // A THEN dependency requires the prior order to have a determinable finish.
+ for(const frame of frames){
+   const predecessor=frame.dependencies?.[0]&&frames[frame.dependencies[0].frame];
+   if(predecessor&&["ADVANCE","REVERSE","TURN","TRAVERSE"].includes(predecessor.action)&&
+      predecessor.degrees===null&&predecessor.distance===null&&!predecessor.condition){
+     errors.push({code:"NON_TERMINATING_DEPENDENCY",clause:frame.raw});
+   }
  }
  // Concurrent contradictory instructions are rejected atomically, not applied last-wins.
  const driving=new Set(["ADVANCE","REVERSE","HALT"]);
