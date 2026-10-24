@@ -11,7 +11,7 @@ export const obstacles=[
  {x:-83,z:189,w:55,d:9,h:5,type:'hedge'},
  {x:32,z:211,w:65,d:8,h:5,type:'hedge'}
 ];
-export function terrainHeight(x,z){return 1.8*Math.sin(x*.015)*Math.cos(z*.023)+2*Math.exp(-((z-165)/38)**2);}
+export function terrainHeight(x,z){return 1.8*Math.sin(x*.015)*Math.cos(z*.023)+2*Math.exp(-(((z-165)/38)**2));}
 export function intersectRect(x,z,o,margin=0){return x>o.x-o.w/2-margin&&x<o.x+o.w/2+margin&&z>o.z-o.d/2-margin&&z<o.z+o.d/2+margin;}
 export function blocked(a,b,ignore=[]) {
  for(let i=1;i<60;i++){const t=i/60,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
