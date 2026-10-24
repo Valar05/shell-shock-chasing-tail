@@ -11,6 +11,12 @@ function point(x,z){const dx=x-g.player.x,dz=z-g.player.z,r=g.view*Math.PI/180;
  return [canvas.clientWidth/2+(dx*Math.cos(r)-dz*Math.sin(r))*scale,canvas.clientHeight*.63-(dx*Math.sin(r)+dz*Math.cos(r))*scale];}
 function poly(points,color,stroke='#1d2e21'){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}
 function rectangle(x,z,w,d,color){poly([[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]].map(p=>point(...p)),color);}
+function buildingArt(o,id){const b=g.breaches.find(v=>v.id===id);if(!b){rectangle(o.x,o.z,o.w,o.d,'#8a6756');return;}
+ const jag=2.2;
+ if(b.axis==='z'){const left=o.x-o.w/2,right=o.x+o.w/2,cutL=b.center-b.width/2,cutR=b.center+b.width/2;
+  const halves=[[[left,o.z-o.d/2],[cutL-jag,o.z-o.d/2],[cutL+jag,o.z-o.d/4],[cutL-jag,o.z],[cutL+jag,o.z+o.d/4],[cutL,o.z+o.d/2],[left,o.z+o.d/2]],[[cutR,o.z-o.d/2],[right,o.z-o.d/2],[right,o.z+o.d/2],[cutR,o.z+o.d/2],[cutR-jag,o.z+o.d/4],[cutR+jag,o.z],[cutR-jag,o.z-o.d/4]]];halves.forEach(h=>poly(h.map(v=>point(...v)),'#8a6756'));}
+ else{const low=o.z-o.d/2,high=o.z+o.d/2,a=b.center-b.width/2,c=b.center+b.width/2;[[[o.x-o.w/2,low],[o.x+o.w/2,low],[o.x+o.w/2,a],[o.x+o.w/4,a+jag],[o.x,a-jag],[o.x-o.w/4,a+jag],[o.x-o.w/2,a]],[[o.x-o.w/2,c],[o.x-o.w/4,c-jag],[o.x,c+jag],[o.x+o.w/4,c-jag],[o.x+o.w/2,c],[o.x+o.w/2,high],[o.x-o.w/2,high]]].forEach(h=>poly(h.map(v=>point(...v)),'#8a6756'));}
+}
 function tankArt(t,color){
  const r=t.hull*Math.PI/180,ca=Math.cos(r),si=Math.sin(r);
  const hull=[[-5,-6],[5,-6],[5,6],[-5,6]].map(([x,z])=>point(t.x+x*ca+z*si,t.z-x*si+z*ca));
@@ -25,7 +31,7 @@ function drawWorld(){
  for(let x=-200;x<=200;x+=25){const a=point(x,-25),b=point(x,260);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.lineWidth=1;ctx.stroke();}
  for(let z=0;z<=250;z+=25){const a=point(-205,z),b=point(205,z);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.stroke();}
  rectangle(15,120,15,260,'#ac9d7c');
- for(const o of obstacles)rectangle(o.x,o.z,o.w,o.d,o.type==='hedge'?'#334e2b':'#8a6756');
+ for(const [id,o] of obstacles.entries()){if(o.type==='house')buildingArt(o,id);else rectangle(o.x,o.z,o.w,o.d,'#334e2b');}
  if(g.enemy.hp>0)tankArt(g.enemy,'#76674e');
  tankArt(p,'#d2c292');
  const [cx,cy]=point(p.x,p.z);
