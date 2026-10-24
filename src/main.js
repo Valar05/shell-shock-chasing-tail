@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
 import './style.css';
 const root=document.querySelector('#app');
-root.innerHTML=`<div id="viewport"></div><div id="hud"><div id="title">SHELL SHOCK <small>CHASING TAIL · ORCHARD CONTACT</small></div><div id="bearings"></div><div id="status"></div><div id="message"></div><div id="orders"><form id="form"><input id="order" placeholder="Command your crew…" autocomplete="off" aria-label="Command your crew"/><button>Issue order</button></form><div id="shortcuts"><button data-order="Silver report">Report</button><button data-order="Delta advance">Advance</button><button data-order="Delta halt">Halt</button><button data-order="Delta reverse">Reverse</button><button data-order="Delta left">Turn left</button><button data-order="Delta right">Turn right</button><button data-order="Beta acquire">Acquire</button><button data-order="Gamma load AP">Load AP</button><button data-order="Beta fire">Fire</button><button id="restart" type="button">Restart</button></div></div></div>`;
+root.innerHTML=`<div id="viewport"></div><div id="hud"><div id="title">SHELL SHOCK <small>CHASING TAIL · ORCHARD CONTACT</small></div><div id="bearings"></div><div id="status"></div><div id="message"></div><div id="orders"><div id="voice-panel"><button id="mic" type="button" aria-pressed="false">🎙️ Start voice command</button><span id="voice-state" role="status" aria-live="polite">Tap microphone and speak to your crew</span></div><details id="type-fallback"><summary>Keyboard commands (alternative)</summary><form id="form"><input id="order" placeholder="Command your crew…" autocomplete="off" aria-label="Command your crew"/><button>Issue order</button></form></details><div id="shortcuts"><button data-order="Silver report">Report</button><button data-order="Delta advance">Advance</button><button data-order="Delta halt">Halt</button><button data-order="Delta reverse">Reverse</button><button data-order="Delta left">Turn left</button><button data-order="Delta right">Turn right</button><button data-order="Beta acquire">Acquire</button><button data-order="Gamma load AP">Load AP</button><button data-order="Beta fire">Fire</button><button id="restart" type="button">Restart</button></div></div></div>`;
 const viewport=document.querySelector('#viewport');const scene=new THREE.Scene();scene.background=new THREE.Color(0x9eafa5);scene.fog=new THREE.Fog(0x9eafa5,90,310);
 const camera=new THREE.PerspectiveCamera(50,1,.1,390);const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'low-power'});renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));viewport.append(renderer.domElement);
 scene.add(new THREE.HemisphereLight(0xdde7dc,0x666341,2));
@@ -20,20 +20,31 @@ const turretPivot=new THREE.Group();turretPivot.position.y=4;const tur=new THREE
 const barrel=new THREE.Mesh(new THREE.CylinderGeometry(.45,.55,10,7),material(0x424642));barrel.rotation.x=Math.PI/2;barrel.position.set(0,.4,6);turretPivot.add(barrel);group.add(turretPivot);scene.add(group);return{group,turretPivot};}
 const enemyArt=tank(0x6e6c59);let g=makeGame(1);
 function updateArt(){const e=g.enemy;enemyArt.group.position.set(e.x,terrainHeight(e.x,e.z),e.z);enemyArt.group.rotation.y=e.hull*Math.PI/180;enemyArt.turretPivot.rotation.y=diff(e.turret,e.hull)*Math.PI/180;enemyArt.group.visible=e.hp>0;}
-const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP ENEMY TO DESIGNATE</small>';viewport.append(reticle);
+const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
 function size(){const w=innerWidth,h=innerHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
-let dragging=false,down=0,lastX=0,lastY=0;
+let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
 renderer.domElement.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;renderer.domElement.setPointerCapture(ev.pointerId)});
-renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view+(ev.clientX-lastX)*.14);lastX=ev.clientX;lastY=ev.clientY;});
+renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
 renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
 const ui=document.querySelector('#message');
-function issue(s){g.message=command(g,s);renderHud();}document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
+function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){g=makeGame(g.seed+1);pitch=0;renderHud();return;}g.message=command(g,s);renderHud();}
+const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voice-state');
+const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;let recognition=null,listening=false,wantListening=false;
+function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Stop listening':'🎙️ Start voice command';voiceState.textContent=message;}
+if(SpeechRecognition){recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
+ recognition.onstart=()=>{listening=true;updateVoice('Listening for crew orders…');};
+ recognition.onresult=ev=>{let interim='';for(let i=ev.resultIndex;i<ev.results.length;i++){const transcript=ev.results[i][0]?.transcript?.trim()||'';if(ev.results[i].isFinal){if(transcript){issue(transcript);updateVoice('Heard: '+transcript);}}else interim=transcript;}if(interim)voiceState.textContent='Hearing: '+interim;};
+ recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error))wantListening=false;updateVoice('Microphone: '+ev.error+'. Tap to retry or use keyboard.');};
+ recognition.onend=()=>{listening=false;if(wantListening){try{recognition.start();}catch{wantListening=false;updateVoice('Recognition stopped; tap microphone to retry.');}}else updateVoice('Microphone off. Tap to speak.');};
+ mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){updateVoice('Starting microphone…');if(!listening)try{recognition.start();}catch{wantListening=false;updateVoice('Could not start microphone. Try again.');}}else{updateVoice('Stopping microphone…');recognition.stop();}});
+}else{mic.disabled=true;updateVoice('This browser does not provide speech recognition. Use a supported browser or keyboard fallback.');}
+document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
-document.querySelector('#restart').addEventListener('click',()=>{g=makeGame(g.seed+1);renderHud()});
+document.querySelector('#restart').addEventListener('click',()=>{g=makeGame(g.seed+1);pitch=0;renderHud()});
 function renderHud(){document.querySelector('#bearings').textContent='HULL '+Math.round(g.player.hull).toString().padStart(3,'0')+'°  |  VIEW '+Math.round(g.view).toString().padStart(3,'0')+'°  |  GUN '+Math.round(g.player.turret).toString().padStart(3,'0')+'°';
  document.querySelector('#status').textContent='ARMOR '+Math.max(0,Math.round(g.player.hp))+'% · GUN '+(g.loaded||'EMPTY')+' · '+(g.player.aimTime>1.8?'LAID':'ACQUIRING')+' · '+(g.enemySeen?'PANZER CONTACT':'NO CONTACT')+(g.finished?' · '+g.finished.toUpperCase():'');
  ui.textContent=g.message+(g.finished?' · Press Restart for another seed.':'');}
 let last=performance.now(),hud=0;function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.06);last=now;step(g,dt);updateArt();
  const p=g.player;camera.position.set(p.x,terrainHeight(p.x,p.z)+5.7,p.z);
- const rad=g.view*Math.PI/180;camera.lookAt(p.x+Math.sin(rad)*100,camera.position.y-1,p.z+Math.cos(rad)*100);
+ const rad=g.view*Math.PI/180;camera.lookAt(p.x+Math.sin(rad)*100,camera.position.y+Math.tan(pitch*Math.PI/180)*100,p.z+Math.cos(rad)*100);
  renderer.render(scene,camera);hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
