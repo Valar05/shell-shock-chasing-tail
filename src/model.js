@@ -110,7 +110,8 @@ function executeFrame(g,job){
  job.startBearing=p.hull;
  let response="";
  if(f.action==="ADVANCE"||f.action==="REVERSE"){
-  p.moving=f.action==="ADVANCE"?11:-9;
+  const multiplier=f.speedProfile==="SLOW"?.45:f.speedProfile==="FAST"?1.35:1;
+  p.moving=(f.action==="ADVANCE"?11:-9)*multiplier;
   p.moveRemaining=f.distance;
   response="Delta: "+(p.moving>0?"Advancing":"Reversing")+(f.distance===null?".":" "+f.distance+" meters.");
  }else if(f.action==="HALT"){
@@ -188,6 +189,7 @@ function processOrderGraph(g){
  for(const job of g.orderJobs||[]){
   if(job.status!=="pending")continue;
   const deps=job.frame.dependencies||[];
+  if(deps.some(d=>g.orderJobs.some(j=>j.packet===job.packet&&j.frame.index===d.frame&&j.status==="skipped"))){job.status="skipped";continue;}
   if(deps.some(d=>!g.orderJobs.some(j=>j.packet===job.packet&&j.frame.index===d.frame&&j.status==="done")))continue;
   const condition=job.frame.condition;
   if(condition&&condition.mode!=="UNTIL"&&!conditionMet(g,condition)){
@@ -207,6 +209,7 @@ export function command(g,input){
   return "Restart available by voice or Play again.";
  }
  g.discourse=parsed.discourse;
+ g.lastCompiled={normalized:parsed.normalized,frames:parsed.frames.map(f=>({action:f.action,actor:f.actor,degrees:f.degrees,distance:f.distance,relation:f.relation,condition:f.condition}))};
  g.orderJobs ||= [];
  g.orderPacketId=(g.orderPacketId||0)+1;
  const packet=g.orderPacketId,receipts=[];
