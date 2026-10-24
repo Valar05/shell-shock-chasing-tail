@@ -42,3 +42,9 @@ html,body,#app{height:100%;height:100dvh;width:100%;overscroll-behavior:none}
 #compass{position:absolute;top:44px;left:50%;transform:translateX(-50%);width:min(68vw,540px);height:43px;overflow:hidden;pointer-events:none;background:linear-gradient(90deg,transparent,rgba(12,26,20,.77) 15%,rgba(12,26,20,.77) 85%,transparent);border-bottom:1px solid #dccc8a66}
 #compass-ticks{position:absolute;inset:0}#compass-center{position:absolute;top:1px;left:50%;transform:translateX(-50%);color:#ffe08a;font-size:17px;z-index:2}.tick{position:absolute;bottom:4px;transform:translateX(-50%);display:flex;flex-direction:column-reverse;align-items:center;height:23px;gap:2px}.tick span{width:1px;height:6px;background:#dbcda3}.tick.medium span{height:11px}.tick.major span{height:15px;width:2px;background:#ffe7a0}.tick b{font-size:10px;font-weight:700;color:#f4e6ba;white-space:nowrap}
 @media (orientation:landscape) and (max-height:600px){#compass{top:29px;height:38px;width:min(58vw,500px)}#compass-center{font-size:14px}.tick b{font-size:9px}}
+
+/* Canvas attributes are backing-store pixels, not CSS layout dimensions. */
+#battle-canvas{position:absolute;inset:0;display:block;width:100%!important;height:100%!important;max-width:100%;max-height:100%;touch-action:none}
+#viewport,#hud{width:100%;max-width:100%;overflow:hidden}
+#app{position:fixed;inset:0;width:100vw;height:100dvh;overflow:hidden}
+#compass{max-width:calc(100vw - 28px)}
