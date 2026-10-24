@@ -29,6 +29,15 @@ try{
  await page.locator('#order').fill('Silver report');
  await page.locator('#form button').click();
  if(errors.length)throw Error('Browser errors: '+errors.join('\n'));
- await mkdir('artifacts',{recursive:true});await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
+ await mkdir('artifacts',{recursive:true});
+ const phone=await browser.newPage({viewport:{width:915,height:412},deviceScaleFactor:2,isMobile:true,hasTouch:true});
+ await phone.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+ await phone.locator('#mic').waitFor();
+ if(!(await phone.locator('#mic').isVisible()))throw Error('Mobile microphone toggle absent');
+ const boundsMobile=await phone.locator('#mic').boundingBox();
+ if(!boundsMobile||boundsMobile.y<0||boundsMobile.y+boundsMobile.height>412||boundsMobile.x+boundsMobile.width>915)throw Error('Mobile microphone outside viewport');
+ await phone.screenshot({path:'artifacts/mobile-landscape.png'});
+ await phone.close();
+await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
  console.log('Browser smoke passed; screenshot saved.');
 }finally{await browser?.close();server.kill();}
