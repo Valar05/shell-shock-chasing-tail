@@ -74,6 +74,7 @@ try{
  });
  await voice.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
  await voice.locator('#mic').click();
+ await voice.waitForFunction(()=>Boolean(window.__testRecognition));
  await voice.evaluate(()=>{
   const result=[{transcript:'Driver advance and turn 20 degrees left'}];result.isFinal=true;
   window.__testRecognition.onresult({resultIndex:0,results:[result]});
