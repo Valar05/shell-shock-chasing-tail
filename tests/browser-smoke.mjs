@@ -42,6 +42,50 @@ try{
  if(!webgl)throw Error('First-person Three.js WebGL context missing');
  await phone.screenshot({path:'artifacts/mobile-landscape.png'});
  await phone.close();
+
+ // Visual steering contract: a left command must turn the physical view left,
+ // making a fixed landmark straight ahead shift to the screen's right.
+ const orient=await browser.newPage({viewport:{width:1200,height:780}});
+ await orient.goto('http://127.0.0.1:4173/?debug=1',{waitUntil:'networkidle'});
+ await orient.waitForFunction(()=>Boolean(window.__shellShockDebug));
+ const initial=await orient.evaluate(()=>{
+  const d=window.__shellShockDebug,p=d.player();
+  return {hull:d.hull(),x:d.project(p.x,p.z+80).x,marker:p};
+ });
+ await orient.locator('button[data-order="Delta left"]').click();
+ await orient.waitForTimeout(900);
+ const turned=await orient.evaluate((p)=>({
+  hull:window.__shellShockDebug.hull(),
+  x:window.__shellShockDebug.project(p.x,p.z+80).x
+ }),initial.marker);
+ if(!(((turned.hull-initial.hull+540)%360)-180<-2&&turned.x>initial.x+.04))
+  throw Error('LEFT steering visually reversed or stalled: '+JSON.stringify({initial,turned}));
+ await orient.close();
+
+ // Voice-first end-to-end with an injected browser speech recognizer: final
+ // transcript commits immediately while the microphone remains toggled on.
+ const voice=await browser.newPage({viewport:{width:915,height:412}});
+ await voice.addInitScript(()=>{
+  class FakeRecognition{
+   start(){window.__testRecognition=this;this.onstart?.();}
+   stop(){this.onend?.();}
+  }
+  window.SpeechRecognition=FakeRecognition;
+ });
+ await voice.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+ await voice.locator('#mic').click();
+ await voice.waitForFunction(()=>Boolean(window.__testRecognition));
+ await voice.evaluate(()=>{
+  const result=[{transcript:'Driver advance and turn 20 degrees left'}];result.isFinal=true;
+  window.__testRecognition.onresult({resultIndex:0,results:[result]});
+ });
+ const spoken=await voice.locator('#message').textContent();
+ if(!/Advancing/.test(spoken)||!/Turning left 20 degrees/.test(spoken))
+  throw Error('Compound voice command was not executed atomically: '+spoken);
+ if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
+  throw Error('Microphone is not an active toggle');
+ await voice.close();
+
 await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
  console.log('Browser smoke passed; screenshot saved.');
 }finally{await browser?.close();server.kill();}

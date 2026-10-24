@@ -97,6 +97,8 @@ function conditionMet(g,condition){
 function resolveBearing(g,reference){
  if(reference.type==="ABSOLUTE")return norm(reference.value);
  if(reference.type==="CLOCK")return norm(g.player.hull+(reference.value%12)*30);
+ const cardinal={north:0,northeast:45,east:90,southeast:135,south:180,southwest:225,west:270,northwest:315};
+ if(reference.type==="CARDINAL")return cardinal[reference.value];
  const offsets={ahead:0,front:0,forward:0,left:-90,port:-90,right:90,starboard:90,behind:180,rear:180};
  return norm(g.player.hull+offsets[reference.value]);
 }
@@ -108,7 +110,8 @@ function executeFrame(g,job){
  job.startBearing=p.hull;
  let response="";
  if(f.action==="ADVANCE"||f.action==="REVERSE"){
-  p.moving=f.action==="ADVANCE"?11:-9;
+  const multiplier=f.speedProfile==="SLOW"?.45:f.speedProfile==="FAST"?1.35:1;
+  p.moving=(f.action==="ADVANCE"?11:-9)*multiplier;
   p.moveRemaining=f.distance;
   response="Delta: "+(p.moving>0?"Advancing":"Reversing")+(f.distance===null?".":" "+f.distance+" meters.");
  }else if(f.action==="HALT"){
@@ -119,6 +122,12 @@ function executeFrame(g,job){
   p.turn=f.direction==="left"?-22:22;
   p.turnRemaining=f.degrees;
   response="Delta: Turning "+f.direction+(f.degrees===null?" until ordered to halt.":" "+f.degrees+" degrees.");
+ }else if(f.action==="HEADING"){
+  const angle=resolveBearing(g,f.bearing);const delta=diff(angle,p.hull);
+  p.turn=Math.abs(delta)<.001?0:Math.sign(delta)*22;
+  p.turnRemaining=Math.abs(delta);
+  response="Delta: Turning to heading "+Math.round(angle)+" degrees.";
+  if(!p.turn){job.status="done";}
  }else if(f.action==="TRAVERSE"){
   p.aim=null;p.gunTraverse=f.direction==="left"?-18:18;
   p.gunTraverseRemaining=f.degrees;
@@ -157,7 +166,7 @@ function executeFrame(g,job){
 function jobComplete(g,job){
  const f=job.frame,p=g.player;
  if(["HALT","HOLD_FIRE","REPORT","SPOT","RESTART"].includes(f.action))return true;
- if(f.action==="TURN")return f.degrees!==null&&p.turn===0;
+ if(["TURN","HEADING"].includes(f.action))return f.action==="HEADING"?p.turn===0:f.degrees!==null&&p.turn===0;
  if(f.action==="TRAVERSE")return f.degrees!==null&&p.gunTraverse===0;
  if(["ADVANCE","REVERSE"].includes(f.action))return f.distance!==null&&p.moveRemaining===0;
  if(f.action==="LOAD")return Boolean(g.loaded)&&(!f.ammo||g.loaded===f.ammo);
@@ -180,6 +189,7 @@ function processOrderGraph(g){
  for(const job of g.orderJobs||[]){
   if(job.status!=="pending")continue;
   const deps=job.frame.dependencies||[];
+  if(deps.some(d=>g.orderJobs.some(j=>j.packet===job.packet&&j.frame.index===d.frame&&j.status==="skipped"))){job.status="skipped";continue;}
   if(deps.some(d=>!g.orderJobs.some(j=>j.packet===job.packet&&j.frame.index===d.frame&&j.status==="done")))continue;
   const condition=job.frame.condition;
   if(condition&&condition.mode!=="UNTIL"&&!conditionMet(g,condition)){
@@ -199,6 +209,7 @@ export function command(g,input){
   return "Restart available by voice or Play again.";
  }
  g.discourse=parsed.discourse;
+ g.lastCompiled={normalized:parsed.normalized,frames:parsed.frames.map(f=>({action:f.action,actor:f.actor,degrees:f.degrees,distance:f.distance,relation:f.relation,condition:f.condition}))};
  g.orderJobs ||= [];
  g.orderPacketId=(g.orderPacketId||0)+1;
  const packet=g.orderPacketId,receipts=[];

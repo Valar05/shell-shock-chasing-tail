@@ -15,20 +15,21 @@ const tankTexture=spriteTexture(x=>{x.fillStyle='#414b3d';x.fillRect(22,60,84,38
 const treeTexture=spriteTexture(x=>{x.fillStyle='#584431';x.fillRect(57,70,14,58);x.fillStyle='#365e35';for(const [px,py,r] of [[38,55,30],[85,52,31],[63,31,35]]){x.beginPath();x.arc(px,py,r,0,Math.PI*2);x.fill();}});
 const hedgeTexture=spriteTexture(x=>{x.fillStyle='#34522c';x.fillRect(0,27,128,101);for(let i=0;i<11;i++){x.beginPath();x.arc(i*13,28+(i%3)*7,20,0,Math.PI*2);x.fill();}});
 function houseTexture(breach){return spriteTexture(x=>{x.fillStyle='#8c7260';x.fillRect(8,40,112,88);x.fillStyle='#744d3e';x.beginPath();x.moveTo(0,43);x.lineTo(64,0);x.lineTo(128,43);x.fill();if(breach){x.globalCompositeOperation='destination-out';x.beginPath();x.moveTo(47,128);x.lineTo(50,80);x.lineTo(44,66);x.lineTo(53,54);x.lineTo(76,54);x.lineTo(84,69);x.lineTo(79,85);x.lineTo(83,128);x.closePath();x.fill();x.globalCompositeOperation='source-over';}});}
-function billboard(texture,w,h,x,z,y=0){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.1,side:THREE.DoubleSide,depthWrite:true}));m.position.set(x,y+h/2,z);scene.add(m);return m;}
+function billboard(texture,w,h,x,z,y=0){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.1,side:THREE.DoubleSide,depthWrite:true}));m.position.set(-x,y+h/2,z);scene.add(m);return m;}
 const environment=[];
 for(const [id,o] of obstacles.entries()){const isHouse=o.type==='house',t=isHouse?houseTexture(false):hedgeTexture;const m=billboard(t,Math.max(o.w,16),isHouse?18:7,o.x,o.z);environment.push({id,o,m,breached:false});}
 for(let i=0;i<48;i++){const x=Math.sin(i*43.17)*175,z=(i*47)%250;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+9&&Math.abs(z-o.z)<o.d/2+9))continue;billboard(treeTexture,13,18,x,z);}
 const enemySprite=billboard(tankTexture,13,11,0,0);
-function drawWorld(){const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(e.x,5.5,e.z);
+function drawWorld(){const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(-e.x,5.5,e.z);
 enemySprite.lookAt(camera.position.x,5.5,camera.position.z);
 for(const item of environment){item.m.lookAt(camera.position.x,item.m.position.y,camera.position.z);if(item.o.type==='house'&&g.breaches.some(b=>b.id===item.id)&&!item.breached){item.breached=true;item.m.material.map=houseTexture(true);item.m.material.needsUpdate=true;}}
-camera.position.set(g.player.x,5.8,g.player.z);const r=g.view*Math.PI/180,el=pitch*Math.PI/180;camera.lookAt(g.player.x+Math.sin(r)*Math.cos(el)*100,5.8+Math.sin(el)*100,g.player.z+Math.cos(r)*Math.cos(el)*100);renderer.render(scene,camera);}
+camera.position.set(-g.player.x,5.8,g.player.z);const r=g.view*Math.PI/180,el=pitch*Math.PI/180;camera.lookAt(-g.player.x-Math.sin(r)*Math.cos(el)*100,5.8+Math.sin(el)*100,g.player.z+Math.cos(r)*Math.cos(el)*100);renderer.render(scene,camera);}
+if(new URLSearchParams(location.search).has('debug'))window.__shellShockDebug={view:()=>g.view,hull:()=>g.player.hull,project:(x,z)=>{const p=new THREE.Vector3(-x,5.5,z).project(camera);return {x:p.x,y:p.y}},player:()=>({x:g.player.x,z:g.player.z})};
 const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
 function size(){const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
 let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
 renderer.domElement.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;renderer.domElement.setPointerCapture(ev.pointerId)});
-renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
+renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view+(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
 renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
 const ui=document.querySelector('#message');
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
@@ -60,4 +61,4 @@ function renderCompass(){const width=document.querySelector('#compass').clientWi
 function renderHud(){renderCompass();document.querySelector('#bearings').textContent='HULL '+Math.round(g.player.hull).toString().padStart(3,'0')+'°  |  VIEW '+Math.round(g.view).toString().padStart(3,'0')+'°  |  GUN '+Math.round(g.player.turret).toString().padStart(3,'0')+'°';
  document.querySelector('#status').textContent='ARMOR '+Math.max(0,Math.round(g.player.hp))+'% · GUN '+(g.loaded||'EMPTY')+' · '+(g.player.aimTime>1.8?'LAID':'ACQUIRING')+' · '+(g.enemySeen?'PANZER CONTACT':'NO CONTACT')+(g.finished?' · '+g.finished.toUpperCase():'');
  ui.textContent=g.message;const end=document.querySelector('#end-screen');if(g.finished){end.hidden=false;document.querySelector('#end-title').textContent=g.finished==='Victory'?'Victory · Enemy destroyed':'Defeat · Tank knocked out';document.querySelector('#end-caption').textContent=g.message;}else end.hidden=true;}
-let last=performance.now(),hud=0;function frame(now){requestAnimationFrame(frame);let dt=Math.min((now-last)/1000,.06);last=now;step(g,dt);drawWorld();hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
+let last=performance.now(),hud=0,simulationDebt=0;function frame(now){requestAnimationFrame(frame);const dt=Math.min(Math.max((now-last)/1000,0),.25);last=now;simulationDebt+=dt;let steps=0;while(simulationDebt>=.02&&steps<13){step(g,.02);simulationDebt-=.02;steps++;}drawWorld();hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
