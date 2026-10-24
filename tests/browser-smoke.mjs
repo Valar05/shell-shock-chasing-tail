@@ -11,6 +11,15 @@ try{
  const errors=[];page.on('pageerror',e=>errors.push(String(e)));
  await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
  await page.locator('#viewport canvas').waitFor();
+ await page.locator('#mic').waitFor();
+ if(!(await page.locator('#mic').isVisible()))throw Error('Primary microphone control missing');
+ await page.locator('#type-fallback').evaluate(e=>e.open=true);
+ const before=await page.locator('#bearings').textContent();
+ const bounds=await page.locator('#viewport canvas').boundingBox();
+ await page.mouse.move(bounds.x+bounds.width*.5,bounds.y+bounds.height*.4);
+ await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.5+120,bounds.y+bounds.height*.4-60,{steps:6});await page.mouse.up();
+ const after=await page.locator('#bearings').textContent();
+ if(before===after)throw Error('Camera horizontal movement did not update heading');
  await page.waitForTimeout(700);
  await page.locator('#bearings').getByText(/HULL/).count().then(n=>{if(!n)throw Error('Heading instrumentation missing');});
  await page.locator('button[data-order="Delta advance"]').click();
