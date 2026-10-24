@@ -29,12 +29,24 @@ export function makeGame(seed=1){
 export function designate(g){const p=g.player,e=g.enemy;const b=bearing(p,e);if(Math.abs(diff(g.view,b))>14||blocked(p,e))return false;g.enemySeen=true;p.aim='enemy';p.aimTime=0;return true;}
 export function command(g,input){
  const c=input.toLowerCase().replace(/[.,!?]/g,'').trim();const p=g.player;
- if(/\b(restart|retry)\b/.test(c))return 'Restart with the Restart button.';
+ if(/\b(restart|retry)\b/.test(c))return 'Restart available by voice or Play again.';
  if(/\b(delta|driver)\b/.test(c)){
   if(/\b(halt|stop)\b/.test(c)){p.moving=0;p.turn=0;p.turnRemaining=0;return 'Delta: Halted, sir.';}
   if(/\b(reverse|back)\b/.test(c)){p.moving=-9;return 'Delta: Reversing.';}
   if(/\b(advance|forward|move)\b/.test(c)){p.moving=11;return 'Delta: Advancing.';}
   const d=c.match(/\b(left|right)\b/);if(d){const magnitude=c.match(/\b(\d+(?:\.\d+)?)\s*(?:degrees?|deg)?\b/);const spoken=c.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty|forty five|ninety|one hundred|one eighty)\b/);const numbers={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,fifteen:15,twenty:20,thirty:30,forty:40,'forty five':45,ninety:90,'one hundred':100,'one eighty':180};const degrees=magnitude?Number(magnitude[1]):spoken?numbers[spoken[1]]:null;if(degrees!==null&&(!Number.isFinite(degrees)||degrees<=0||degrees>360))return 'Delta: Specify a turn from 1 to 360 degrees.';p.turn=d[1]==='left'?-22:22;p.turnRemaining=degrees;return 'Delta: Turning '+d[1]+(degrees===null?' until ordered to halt.':' '+degrees+' degrees.');}
+ }
+ // Commander bearing callouts are references, not magical target acquisition.
+ const clock=c.match(/\b(?:at|on|bearing|target|enemy|contact)?\s*(1[0-2]|[1-9])\s*o\s*clock\b/);
+ const absolute=c.match(/\b(?:bearing|azimuth|heading)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
+ const vague=c.match(/\b(ahead|forward|front|left|right|behind|rear|back)\b/);
+ if((clock||absolute||vague)&&/\b(beta|gunner|silver|contact|target|enemy|panzer|spot|designate|bearing|azimuth)\b/.test(c)){
+  let indicated,kind,tolerance;
+  if(clock){indicated=norm(p.hull+((Number(clock[1])%12)*30));kind=clock[1]+" o'clock";tolerance=16;}
+  else if(absolute){indicated=norm(Number(absolute[1]));kind='bearing '+Math.round(indicated)+'°';tolerance=9;}
+  else {const dirs={ahead:0,forward:0,front:0,left:-90,right:90,behind:180,rear:180,back:180};indicated=norm(p.hull+dirs[vague[1]]);kind=vague[1];tolerance=48;}
+  if(Math.abs(diff(bearing(p,g.enemy),indicated))<=tolerance&&!blocked(p,g.enemy)&&g.enemy.hp>0){g.enemySeen=true;p.aim='enemy';p.aimTime=0;return 'Beta: Contact confirmed '+kind+'. Traversing to target.';}
+  return 'Silver: Checking '+kind+'. No confirmed armor there.';
  }
  if(/\b(gamma|loader)\b/.test(c)||/\bload\b/.test(c)){
   const m=c.match(/\b(ap|he|smoke)\b/);if(m)g.selected=m[1].toUpperCase();if(!g.loaded&&g.loading<=0)g.loading=3.8;return 'Gamma: '+g.selected+' selected; '+(g.loaded?g.loaded+' already in breech.':'loading.');
