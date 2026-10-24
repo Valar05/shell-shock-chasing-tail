@@ -1,3 +1,4 @@
+import {parseTransmission} from './command-parser.js';
 export const norm = a => ((a % 360) + 360) % 360;
 export const diff = (a,b) => ((norm(a-b)+540)%360)-180;
 export const bearing=(from,to)=>norm(Math.atan2(to.x-from.x,to.z-from.z)*180/Math.PI);
@@ -44,7 +45,7 @@ export function makeGame(seed=1){
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
 export function designate(g){const p=g.player,e=g.enemy;const b=bearing(p,e);if(Math.abs(diff(g.view,b))>14||blocked(p,e,[],g.breaches))return false;g.enemySeen=true;p.aim='enemy';p.aimTime=0;return true;}
-export function command(g,input){
+function legacyCommand(g,input){
  const c=input.toLowerCase().replace(/[.,!?]/g,'').trim();const p=g.player;
  if(/\b(restart|retry)\b/.test(c))return 'Restart available by voice or Play again.';
  if(/\b(delta|driver)\b/.test(c)){
@@ -77,6 +78,32 @@ export function command(g,input){
  if(/\b(silver|report|status|contact)\b/.test(c)){return g.enemySeen?'Silver: Enemy armor marked, bearing '+Math.round(bearing(p,g.enemy))+' degrees.':'Silver: No confirmed contact. Keep scanning.';}
  return 'Crew: Say again, sir?';
 }
+
+// Compile first, then apply all valid frames in order. No silently discarded half-orders.
+export function command(g,input){
+ const compiled=parseTransmission(input,g.discourse||{});
+ if(!compiled.ok){
+  // Preserve legacy directional designation and range language until its frame migration.
+  if(/\b(?:bearing|o'?clock|contact|enemy|panzer)\b/i.test(input))return legacyCommand(g,input);
+  return 'Silver: Please clarify '+compiled.errors.map(e=>e.code+' ('+e.clause+')').join('; ')+'.';
+ }
+ g.discourse=compiled.discourse;
+ const receipts=[];
+ for(const frame of compiled.frames){
+  const {actor,action,direction,degrees,ammo}=frame;
+  let raw;
+  if(action==='ADVANCE'||action==='REVERSE'||action==='HALT')raw=actor+' '+({ADVANCE:'advance',REVERSE:'reverse',HALT:'halt'}[action]);
+  else if(action==='TURN')raw=actor+' '+direction+(degrees===null?'':' '+degrees+' degrees');
+  else if(action==='LOAD')raw='Gamma load '+(ammo||g.selected||'AP');
+  else if(action==='FIRE')raw='Beta fire';
+  else if(action==='ACQUIRE')raw='Beta acquire';
+  else if(action==='REPORT')raw='Silver report';
+  else if(action==='RESTART')return 'Restart available by voice or Play again.';
+  if(raw)receipts.push(legacyCommand(g,raw));
+ }
+ return receipts.join(' | ')||'Silver: No executable crew orders.';
+}
+
 export function step(g,dt){
  if(g.finished)return;dt=Math.min(dt,.08);g.elapsed+=dt;const p=g.player,e=g.enemy;
  if(p.turn){const delta=p.turnRemaining===null?p.turn*dt:Math.sign(p.turn)*Math.min(Math.abs(p.turn*dt),p.turnRemaining);p.hull=norm(p.hull+delta);p.turret=norm(p.turret+delta);g.view=norm(g.view+delta);if(p.turnRemaining!==null){p.turnRemaining=Math.max(0,p.turnRemaining-Math.abs(delta));if(p.turnRemaining<.00001){p.turn=0;p.turnRemaining=0;g.message='Delta: Turn complete. Holding heading.';}}}
