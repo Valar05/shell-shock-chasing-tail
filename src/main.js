@@ -1,49 +1,35 @@
+import * as THREE from 'three';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
 import './style.css';
 const root=document.querySelector('#app');
 root.innerHTML=`<div id="viewport"></div><div id="hud"><div id="title">SHELL SHOCK <small>CHASING TAIL · ORCHARD CONTACT</small></div><div id="bearings"></div><div id="compass" aria-label="Compass and viewing bearing"><div id="compass-ticks"></div><div id="compass-center">▼</div></div><div id="status"></div><div id="message"></div><div id="end-screen" hidden role="alertdialog" aria-live="assertive"><strong id="end-title"></strong><p id="end-caption"></p><button id="end-restart" type="button">↻ Play again</button></div><div id="orders"><div id="voice-panel"><button id="mic" type="button" aria-pressed="false">🎙️ Start voice command</button><span id="voice-state" role="status" aria-live="polite">Tap microphone and speak to your crew</span></div><details id="type-fallback"><summary>Keyboard commands (alternative)</summary><form id="form"><input id="order" placeholder="Command your crew…" autocomplete="off" aria-label="Command your crew"/><button>Issue order</button></form></details><div id="shortcuts"><button data-order="Silver report">Report</button><button data-order="Delta advance">Advance</button><button data-order="Delta halt">Halt</button><button data-order="Delta reverse">Reverse</button><button data-order="Delta left">Turn left</button><button data-order="Delta right">Turn right</button><button data-order="Beta acquire">Acquire</button><button data-order="Gamma load AP">Load AP</button><button data-order="Beta fire">Fire</button><button id="restart" type="button">Restart</button></div></div></div>`;
 const viewport=document.querySelector('#viewport');
-const canvas=document.createElement('canvas');canvas.id='battle-canvas';canvas.setAttribute('aria-label','Vector tactical world view');viewport.append(canvas);
-const ctx=canvas.getContext('2d',{alpha:false});
+const scene=new THREE.Scene();scene.background=new THREE.Color(0xa5b8aa);scene.fog=new THREE.Fog(0xa5b8aa,90,340);
+const camera=new THREE.PerspectiveCamera(65,1,.1,400);
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'low-power'});
+renderer.setPixelRatio(Math.min(devicePixelRatio||1,1.6));renderer.domElement.id='battle-canvas';viewport.append(renderer.domElement);
+const ground=new THREE.Mesh(new THREE.PlaneGeometry(440,310),new THREE.MeshBasicMaterial({color:0x798460}));ground.rotation.x=-Math.PI/2;ground.position.z=118;scene.add(ground);
 let g=makeGame(1);
-const scale=2.25;
-function point(x,z){const dx=x-g.player.x,dz=z-g.player.z,r=g.view*Math.PI/180;
- return [canvas.clientWidth/2+(dx*Math.cos(r)-dz*Math.sin(r))*scale,canvas.clientHeight*.63-(dx*Math.sin(r)+dz*Math.cos(r))*scale];}
-function poly(points,color,stroke='#1d2e21'){ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=color;ctx.fill();ctx.strokeStyle=stroke;ctx.lineWidth=2;ctx.stroke();}
-function rectangle(x,z,w,d,color){poly([[x-w/2,z-d/2],[x+w/2,z-d/2],[x+w/2,z+d/2],[x-w/2,z+d/2]].map(p=>point(...p)),color);}
-function buildingArt(o,id){const b=g.breaches.find(v=>v.id===id);if(!b){rectangle(o.x,o.z,o.w,o.d,'#8a6756');return;}
- const jag=2.2;
- if(b.axis==='z'){const left=o.x-o.w/2,right=o.x+o.w/2,cutL=b.center-b.width/2,cutR=b.center+b.width/2;
-  const halves=[[[left,o.z-o.d/2],[cutL-jag,o.z-o.d/2],[cutL+jag,o.z-o.d/4],[cutL-jag,o.z],[cutL+jag,o.z+o.d/4],[cutL,o.z+o.d/2],[left,o.z+o.d/2]],[[cutR,o.z-o.d/2],[right,o.z-o.d/2],[right,o.z+o.d/2],[cutR,o.z+o.d/2],[cutR-jag,o.z+o.d/4],[cutR+jag,o.z],[cutR-jag,o.z-o.d/4]]];halves.forEach(h=>poly(h.map(v=>point(...v)),'#8a6756'));}
- else{const low=o.z-o.d/2,high=o.z+o.d/2,a=b.center-b.width/2,c=b.center+b.width/2;[[[o.x-o.w/2,low],[o.x+o.w/2,low],[o.x+o.w/2,a],[o.x+o.w/4,a+jag],[o.x,a-jag],[o.x-o.w/4,a+jag],[o.x-o.w/2,a]],[[o.x-o.w/2,c],[o.x-o.w/4,c-jag],[o.x,c+jag],[o.x+o.w/4,c-jag],[o.x+o.w/2,c],[o.x+o.w/2,high],[o.x-o.w/2,high]]].forEach(h=>poly(h.map(v=>point(...v)),'#8a6756'));}
-}
-function tankArt(t,color){
- const r=t.hull*Math.PI/180,ca=Math.cos(r),si=Math.sin(r);
- const hull=[[-5,-6],[5,-6],[5,6],[-5,6]].map(([x,z])=>point(t.x+x*ca+z*si,t.z-x*si+z*ca));
- poly(hull,color);const center=point(t.x,t.z);
- ctx.beginPath();ctx.arc(...center,7,0,Math.PI*2);ctx.fillStyle='#474e42';ctx.fill();
- const gunR=t.turret*Math.PI/180,tip=point(t.x+Math.sin(gunR)*12,t.z+Math.cos(gunR)*12);
- ctx.beginPath();ctx.moveTo(...center);ctx.lineTo(...tip);ctx.strokeStyle='#e4dfc6';ctx.lineWidth=5;ctx.stroke();
-}
-function drawWorld(){
- const w=canvas.clientWidth,h=canvas.clientHeight;ctx.fillStyle='#798460';ctx.fillRect(0,0,w,h);
- const p=g.player;
- for(let x=-200;x<=200;x+=25){const a=point(x,-25),b=point(x,260);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.lineWidth=1;ctx.stroke();}
- for(let z=0;z<=250;z+=25){const a=point(-205,z),b=point(205,z);ctx.beginPath();ctx.moveTo(...a);ctx.lineTo(...b);ctx.strokeStyle='#ffffff13';ctx.stroke();}
- rectangle(15,120,15,260,'#ac9d7c');
- for(const [id,o] of obstacles.entries()){if(o.type==='house')buildingArt(o,id);else rectangle(o.x,o.z,o.w,o.d,'#334e2b');}
- if(g.enemy.hp>0)tankArt(g.enemy,'#76674e');
- tankArt(p,'#d2c292');
- const [cx,cy]=point(p.x,p.z);
- ctx.beginPath();ctx.moveTo(cx,cy);const sight=point(p.x+Math.sin(g.view*Math.PI/180)*65,p.z+Math.cos(g.view*Math.PI/180)*65);ctx.lineTo(...sight);ctx.strokeStyle='#fbe49b80';ctx.lineWidth=1;ctx.stroke();
- ctx.fillStyle='#f5efda';ctx.font='12px system-ui';ctx.fillText('VECTOR PROTOTYPE · HEDGES SLOW TRACKS',12,h-14);
-}
+function spriteTexture(draw){const c=document.createElement('canvas');c.width=128;c.height=128;const x=c.getContext('2d');draw(x);const t=new THREE.CanvasTexture(c);t.colorSpace=THREE.SRGBColorSpace;t.magFilter=THREE.NearestFilter;return t;}
+const tankTexture=spriteTexture(x=>{x.fillStyle='#414b3d';x.fillRect(22,60,84,38);x.fillStyle='#a1a48b';x.fillRect(34,42,60,28);x.fillStyle='#363b36';x.fillRect(6,92,116,12);x.fillStyle='#d6cdab';x.fillRect(49,30,29,14);x.fillRect(60,17,12,20);});
+const treeTexture=spriteTexture(x=>{x.fillStyle='#584431';x.fillRect(57,70,14,58);x.fillStyle='#365e35';for(const [px,py,r] of [[38,55,30],[85,52,31],[63,31,35]]){x.beginPath();x.arc(px,py,r,0,Math.PI*2);x.fill();}});
+const hedgeTexture=spriteTexture(x=>{x.fillStyle='#34522c';x.fillRect(0,27,128,101);for(let i=0;i<11;i++){x.beginPath();x.arc(i*13,28+(i%3)*7,20,0,Math.PI*2);x.fill();}});
+function houseTexture(breach){return spriteTexture(x=>{x.fillStyle='#8c7260';x.fillRect(8,40,112,88);x.fillStyle='#744d3e';x.beginPath();x.moveTo(0,43);x.lineTo(64,0);x.lineTo(128,43);x.fill();if(breach){x.globalCompositeOperation='destination-out';x.beginPath();x.moveTo(47,128);x.lineTo(50,80);x.lineTo(44,66);x.lineTo(53,54);x.lineTo(76,54);x.lineTo(84,69);x.lineTo(79,85);x.lineTo(83,128);x.closePath();x.fill();x.globalCompositeOperation='source-over';}});}
+function billboard(texture,w,h,x,z,y=0){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.1,side:THREE.DoubleSide,depthWrite:true}));m.position.set(x,y+h/2,z);scene.add(m);return m;}
+const environment=[];
+for(const [id,o] of obstacles.entries()){const isHouse=o.type==='house',t=isHouse?houseTexture(false):hedgeTexture;const m=billboard(t,Math.max(o.w,16),isHouse?18:7,o.x,o.z);environment.push({id,o,m,breached:false});}
+for(let i=0;i<48;i++){const x=Math.sin(i*43.17)*175,z=(i*47)%250;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+9&&Math.abs(z-o.z)<o.d/2+9))continue;billboard(treeTexture,13,18,x,z);}
+const enemySprite=billboard(tankTexture,13,11,0,0);
+function drawWorld(){const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(e.x,5.5,e.z);
+enemySprite.lookAt(camera.position.x,5.5,camera.position.z);
+for(const item of environment){item.m.lookAt(camera.position.x,item.m.position.y,camera.position.z);if(item.o.type==='house'&&g.breaches.some(b=>b.id===item.id)&&!item.breached){item.breached=true;item.m.material.map=houseTexture(true);item.m.material.needsUpdate=true;}}
+camera.position.set(g.player.x,5.8,g.player.z);const r=g.view*Math.PI/180,el=pitch*Math.PI/180;camera.lookAt(g.player.x+Math.sin(r)*Math.cos(el)*100,5.8+Math.sin(el)*100,g.player.z+Math.cos(r)*Math.cos(el)*100);renderer.render(scene,camera);}
 const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
-function size(){const w=viewport.clientWidth,h=viewport.clientHeight;const ratio=Math.min(devicePixelRatio||1,2);canvas.width=Math.round(w*ratio);canvas.height=Math.round(h*ratio);ctx.setTransform(ratio,0,0,ratio,0,0);}addEventListener('resize',size);size();
+function size(){const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
 let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
-canvas.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;canvas.setPointerCapture(ev.pointerId)});
-canvas.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
-canvas.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
+renderer.domElement.addEventListener('pointerdown',ev=>{dragging=true;down=ev.clientX;lastX=ev.clientX;lastY=ev.clientY;renderer.domElement.setPointerCapture(ev.pointerId)});
+renderer.domElement.addEventListener('pointermove',ev=>{if(!dragging)return;g.view=norm(g.view-(ev.clientX-lastX)*lookSensitivity);pitch=Math.max(-50,Math.min(50,pitch-(ev.clientY-lastY)*lookSensitivity));lastX=ev.clientX;lastY=ev.clientY;});
+renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs(ev.clientX-down)<9){const hit=designate(g);g.message=hit?'Alpha: Panzer designated. Beta, you have the target.':'Silver: No confirmed target on that bearing.';}});
 const ui=document.querySelector('#message');
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){restartGame();return;}g.message=command(g,s);renderHud();}
