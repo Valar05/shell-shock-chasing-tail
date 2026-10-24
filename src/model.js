@@ -41,7 +41,7 @@ export function move(tank,speed,dt,g=null){
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
  return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],
- player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
+ player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
 export function designate(g){const p=g.player,e=g.enemy;const b=bearing(p,e);if(Math.abs(diff(g.view,b))>14||blocked(p,e,[],g.breaches))return false;g.enemySeen=true;p.aim='enemy';p.aimTime=0;return true;}
@@ -96,6 +96,7 @@ export function command(g,input){
   let raw;
   if(action==='ADVANCE'||action==='REVERSE'||action==='HALT')raw=actor+' '+({ADVANCE:'advance',REVERSE:'reverse',HALT:'halt'}[action]);
   else if(action==='TURN')raw=actor+' '+direction+(degrees===null?'':' '+degrees+' degrees');
+  else if(action==='TRAVERSE'){g.player.aim=null;g.player.gunTraverse=direction==='left'?-18:18;g.player.gunTraverseRemaining=degrees;receipts.push('Beta: Traversing '+direction+(degrees===null?' until ordered to halt.':' '+degrees+' degrees.'));continue;}
   else if(action==='LOAD')raw='Gamma load '+(ammo||g.selected||'AP');
   else if(action==='FIRE')raw='Beta fire';
   else if(action==='ACQUIRE')raw='Beta acquire';
@@ -109,6 +110,7 @@ export function command(g,input){
 export function step(g,dt){
  if(g.finished)return;dt=Math.min(dt,.08);g.elapsed+=dt;const p=g.player,e=g.enemy;
  if(p.turn){const delta=p.turnRemaining===null?p.turn*dt:Math.sign(p.turn)*Math.min(Math.abs(p.turn*dt),p.turnRemaining);p.hull=norm(p.hull+delta);p.turret=norm(p.turret+delta);g.view=norm(g.view+delta);if(p.turnRemaining!==null){p.turnRemaining=Math.max(0,p.turnRemaining-Math.abs(delta));if(p.turnRemaining<.00001){p.turn=0;p.turnRemaining=0;g.message='Delta: Turn complete. Holding heading.';}}}
+ if(p.gunTraverse){const delta=p.gunTraverseRemaining===null?p.gunTraverse*dt:Math.sign(p.gunTraverse)*Math.min(Math.abs(p.gunTraverse*dt),p.gunTraverseRemaining);p.turret=norm(p.turret+delta);if(p.gunTraverseRemaining!==null){p.gunTraverseRemaining=Math.max(0,p.gunTraverseRemaining-Math.abs(delta));if(p.gunTraverseRemaining<.00001){p.gunTraverse=0;p.gunTraverseRemaining=0;}}}
  if(p.moving)move(p,p.moving,dt,g);
  if(g.loading>0){g.loading-=dt;if(g.loading<=0){g.loaded=g.selected;g.message='Gamma: '+g.loaded+' loaded.';}}
  if(!g.enemySeen&&!blocked(p,e,[],g.breaches)&&Math.abs(diff(g.view,bearing(p,e)))<13){g.enemySeen=true;g.message='Silver: Enemy Panzer! Bearing '+Math.round(bearing(p,e))+'!';}
