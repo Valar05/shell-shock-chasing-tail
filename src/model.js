@@ -40,7 +40,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -79,32 +79,136 @@ function legacyCommand(g,input){
  return 'Crew: Say again, sir?';
 }
 
-// Compile first, then apply all valid frames in order. No silently discarded half-orders.
+// Deterministic order-graph interpreter. This keeps compound speech atomic at
+// compile time and late-binds conditions/dependencies to real simulation state.
+function conditionMet(g,condition){
+ if(!condition)return true;
+ if(condition.type==="GUNNER_LOCKED")return g.player.aimTime>1.8;
+ if(condition.type==="ROUND_LOADED")return Boolean(g.loaded);
+ if(condition.type==="CONTACT_CONFIRMED")return g.enemySeen;
+ return false;
+}
+function resolveBearing(g,reference){
+ if(reference.type==="ABSOLUTE")return norm(reference.value);
+ if(reference.type==="CLOCK")return norm(g.player.hull+(reference.value%12)*30);
+ const offsets={ahead:0,front:0,forward:0,left:-90,port:-90,right:90,starboard:90,behind:180,rear:180};
+ return norm(g.player.hull+offsets[reference.value]);
+}
+function executeFrame(g,job){
+ const f=job.frame,p=g.player;
+ job.status="running";
+ job.startedAt=g.elapsed;
+ job.startShots=p.shotCount;
+ job.startBearing=p.hull;
+ let response="";
+ if(f.action==="ADVANCE"||f.action==="REVERSE"){
+  p.moving=f.action==="ADVANCE"?11:-9;
+  p.moveRemaining=f.distance;
+  response="Delta: "+(p.moving>0?"Advancing":"Reversing")+(f.distance===null?".":" "+f.distance+" meters.");
+ }else if(f.action==="HALT"){
+  p.moving=0;p.moveRemaining=0;p.turn=0;p.turnRemaining=0;
+  response="Delta: Halted, sir.";
+  job.status="done";
+ }else if(f.action==="TURN"){
+  p.turn=f.direction==="left"?-22:22;
+  p.turnRemaining=f.degrees;
+  response="Delta: Turning "+f.direction+(f.degrees===null?" until ordered to halt.":" "+f.degrees+" degrees.");
+ }else if(f.action==="TRAVERSE"){
+  p.aim=null;p.gunTraverse=f.direction==="left"?-18:18;
+  p.gunTraverseRemaining=f.degrees;
+  response="Beta: Traversing "+f.direction+(f.degrees===null?" until ordered to halt.":" "+f.degrees+" degrees.");
+ }else if(f.action==="LOAD"){
+  if(f.ammo)g.selected=f.ammo;
+  if(!g.loaded&&g.loading<=0)g.loading=3.8;
+  response="Gamma: "+g.selected+" selected; "+(g.loaded?"already loaded.":"loading.");
+ }else if(f.action==="ACQUIRE"){
+  response=legacyCommand(g,"Beta acquire");
+  if(/No confirmed target/.test(response))job.status="done";
+ }else if(f.action==="FIRE"){
+  response=legacyCommand(g,"Beta fire");
+ }else if(f.action==="HOLD_FIRE"){
+  p.hold=true;p.fireRequested=false;
+  response="Beta: Holding fire.";
+  job.status="done";
+ }else if(f.action==="REPORT"){
+  response=legacyCommand(g,"Silver report");
+  job.status="done";
+ }else if(f.action==="SPOT"){
+  const indicated=resolveBearing(g,f.bearing);
+  const tolerance=f.bearing.type==="RELATIVE"?48:f.bearing.type==="CLOCK"?16:9;
+  if(g.enemy.hp>0&&!blocked(p,g.enemy,[],g.breaches)&&Math.abs(diff(bearing(p,g.enemy),indicated))<=tolerance){
+   g.enemySeen=true;p.aim="enemy";p.aimTime=0;
+   response="Beta: Confirmed contact, bearing "+Math.round(indicated)+" degrees.";
+  }else response="Silver: No confirmed target at bearing "+Math.round(indicated)+" degrees.";
+  job.status="done";
+ }else if(f.action==="RESTART"){
+  response="Restart available by voice or Play again.";
+  job.status="done";
+ }
+ if(job.status==="done")job.completedAt=g.elapsed;
+ return response;
+}
+function jobComplete(g,job){
+ const f=job.frame,p=g.player;
+ if(["HALT","HOLD_FIRE","REPORT","SPOT","RESTART"].includes(f.action))return true;
+ if(f.action==="TURN")return f.degrees!==null&&p.turn===0;
+ if(f.action==="TRAVERSE")return f.degrees!==null&&p.gunTraverse===0;
+ if(["ADVANCE","REVERSE"].includes(f.action))return f.distance!==null&&p.moveRemaining===0;
+ if(f.action==="LOAD")return Boolean(g.loaded)&&(!f.ammo||g.loaded===f.ammo);
+ if(f.action==="ACQUIRE")return p.aimTime>1.8;
+ if(f.action==="FIRE")return p.shotCount>job.startShots;
+ return false;
+}
+function processOrderGraph(g){
+ for(const job of g.orderJobs||[]){
+  if(job.status==="running"){
+   if(job.frame.condition?.mode==="UNTIL"&&conditionMet(g,job.frame.condition)){
+    if(["ADVANCE","REVERSE","TURN"].includes(job.frame.action)){g.player.moving=0;g.player.moveRemaining=0;g.player.turn=0;g.player.turnRemaining=0;}
+    if(job.frame.action==="TRAVERSE"){g.player.gunTraverse=0;g.player.gunTraverseRemaining=0;}
+    job.status="done";job.completedAt=g.elapsed;
+    g.message="Crew: Conditional order complete.";
+   }else if(jobComplete(g,job)){job.status="done";job.completedAt=g.elapsed;}
+  }
+ }
+ // Dependencies refer to frames within one transmission, not the global queue.
+ for(const job of g.orderJobs||[]){
+  if(job.status!=="pending")continue;
+  const deps=job.frame.dependencies||[];
+  if(deps.some(d=>!g.orderJobs.some(j=>j.packet===job.packet&&j.frame.index===d.frame&&j.status==="done")))continue;
+  const condition=job.frame.condition;
+  if(condition&&condition.mode!=="UNTIL"&&!conditionMet(g,condition)){
+    if(condition.mode==="IF"){job.status="skipped";g.message="Crew: Condition not met; order not executed.";}
+    continue;
+  }
+  g.message=executeFrame(g,job)||g.message;
+ }
+ // Bound work retained for the running encounter only.
+ if(g.orderJobs?.length>160)g.orderJobs=g.orderJobs.filter(j=>j.status==="pending"||j.status==="running").slice(-160);
+}
 export function command(g,input){
- const designation=/\b(?:bearing|o'?clock|enemy to|contact at|target at)\b/i.test(input);if(designation)return legacyCommand(g,input);
- const compiled=parseTransmission(input,g.discourse||{});
- if(!compiled.ok){
-  // Preserve legacy directional designation and range language until its frame migration.
-  if(/\b(?:bearing|o'?clock|contact|enemy|panzer)\b/i.test(input))return legacyCommand(g,input);
-  return 'Silver: Please clarify '+compiled.errors.map(e=>e.code+' ('+e.clause+')').join('; ')+'.';
+ const parsed=parseTransmission(input,g.discourse||{});
+ if(!parsed.ok)return "Silver: Order not executed. "+parsed.errors.map(e=>e.code+": "+(e.clause||e.detail)).join("; ")+".";
+ if(parsed.frames.some(f=>f.action==="RESTART")){
+  if(parsed.frames.length!==1)return "Silver: Restart must be a separate order.";
+  return "Restart available by voice or Play again.";
  }
- g.discourse=compiled.discourse;
- const receipts=[];
- for(const frame of compiled.frames){
-  if(frame.condition==='GUNNER_LOCKED'&&g.player.aimTime<=1.8){g.pendingFrames.push(frame);receipts.push('Delta: Holding conditional order until Beta reports locked.');continue;}
-  const {actor,action,direction,degrees,ammo}=frame;
-  let raw;
-  if(action==='ADVANCE'||action==='REVERSE'||action==='HALT')raw=actor+' '+({ADVANCE:'advance',REVERSE:'reverse',HALT:'halt'}[action]);
-  else if(action==='TURN')raw=actor+' '+direction+(degrees===null?'':' '+degrees+' degrees');
-  else if(action==='TRAVERSE'){g.player.aim=null;g.player.gunTraverse=direction==='left'?-18:18;g.player.gunTraverseRemaining=degrees;receipts.push('Beta: Traversing '+direction+(degrees===null?' until ordered to halt.':' '+degrees+' degrees.'));continue;}
-  else if(action==='LOAD')raw='Gamma load '+(ammo||g.selected||'AP');
-  else if(action==='FIRE')raw='Beta fire';
-  else if(action==='ACQUIRE')raw='Beta acquire';
-  else if(action==='REPORT')raw='Silver report';
-  else if(action==='RESTART')return 'Restart available by voice or Play again.';
-  if(raw)receipts.push(legacyCommand(g,raw));
+ g.discourse=parsed.discourse;
+ g.orderJobs ||= [];
+ g.orderPacketId=(g.orderPacketId||0)+1;
+ const packet=g.orderPacketId,receipts=[];
+ for(const frame of parsed.frames){
+  const job={packet,frame,status:"pending"};
+  g.orderJobs.push(job);
+  if(frame.dependencies?.length){receipts.push("Crew: Queued "+frame.action.toLowerCase()+" after prior order.");continue;}
+  const condition=frame.condition;
+  if(condition&&condition.mode!=="UNTIL"&&!conditionMet(g,condition)){
+   if(condition.mode==="IF"){job.status="skipped";receipts.push("Crew: Condition not met.");}
+   else receipts.push("Crew: Standing by for "+condition.type.toLowerCase().replace(/_/g," ")+".");
+   continue;
+  }
+  receipts.push(executeFrame(g,job));
  }
- return receipts.join(' | ')||'Silver: No executable crew orders.';
+ return receipts.join(" | ")||"Silver: No executable order.";
 }
 
 export function step(g,dt){
@@ -130,7 +234,7 @@ export function step(g,dt){
   g.message=clear?(dmg?'Beta: HIT! '+(angle>55?'Side armor!':'Frontal armor!'):'Beta: Smoke away!'):'Beta: Shot blocked by terrain!';
   if(clear)e.hp-=dmg;g.loaded=null;g.loading=3.8;p.aimTime=0;e.alert=true;
  }
- if(g.pendingFrames?.length&&p.aimTime>1.8){const ready=g.pendingFrames.filter(f=>f.condition==='GUNNER_LOCKED');g.pendingFrames=g.pendingFrames.filter(f=>f.condition!=='GUNNER_LOCKED');for(const frame of ready){if(frame.action==='HALT'){p.moving=0;p.turn=0;p.turnRemaining=0;g.message='Delta: Gunner locked. Halting as ordered.';}}}
+ processOrderGraph(g);
  if(p.hp<=0){g.finished='Defeat';g.message='Silver: We are hit! Abandon tank!';}
  if(e.hp<=0){g.finished='Victory';g.message='Beta: Panzer knocked out! Target destroyed!';}
 }
