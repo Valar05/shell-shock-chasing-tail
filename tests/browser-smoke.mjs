@@ -18,7 +18,7 @@ try{
  const bounds=await page.locator('#viewport canvas').boundingBox();
  await page.mouse.move(bounds.x+bounds.width*.5,bounds.y+bounds.height*.4);
  await page.mouse.down();await page.mouse.move(bounds.x+bounds.width*.5+120,bounds.y+bounds.height*.4-60,{steps:6});await page.mouse.up();
- const after=await page.locator('#bearings').textContent();
+ await page.waitForTimeout(300);const after=await page.locator('#bearings').textContent();
  if(before===after)throw Error('Camera horizontal movement did not update heading');
  await page.waitForTimeout(700);
  await page.locator('#bearings').getByText(/HULL/).count().then(n=>{if(!n)throw Error('Heading instrumentation missing');});
