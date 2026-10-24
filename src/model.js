@@ -18,8 +18,17 @@ export function blocked(a,b,ignore=[]) {
   if(obstacles.some(o=>!ignore.includes(o)&&intersectRect(x,z,o)))return true;}
  return false;
 }
-export function move(tank,speed,dt){const rad=tank.hull*Math.PI/180;const x=tank.x+Math.sin(rad)*speed*dt,z=tank.z+Math.cos(rad)*speed*dt;
- if(!obstacles.some(o=>intersectRect(x,z,o,5))&&Math.abs(x)<205&&z>-25&&z<260){tank.x=x;tank.z=z;}}
+export function move(tank,speed,dt){
+ const rad=tank.hull*Math.PI/180,x=tank.x+Math.sin(rad)*speed*dt,z=tank.z+Math.cos(rad)*speed*dt;
+ if(Math.abs(x)>=205||z<=-25||z>=260)return;
+ const house=obstacles.some(o=>o.type==='house'&&intersectRect(x,z,o,5));
+ if(house)return;
+ const hedge=obstacles.find(o=>o.type==='hedge'&&intersectRect(x,z,o,5));
+ const effectiveSpeed=hedge?speed*.28:speed;
+ tank.x=tank.x+Math.sin(rad)*effectiveSpeed*dt;
+ tank.z=tank.z+Math.cos(rad)*effectiveSpeed*dt;
+ tank.brushing=Boolean(hedge);
+}
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
  return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,
