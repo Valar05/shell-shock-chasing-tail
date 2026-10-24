@@ -15,7 +15,8 @@
     "package.json",
     "src/**",
     "tests/**",
-    ".gitignore"
+    ".gitignore",
+    ".github/workflows/pages.yml"
   ],
   "lockedPaths": [],
   "evidence": [
@@ -24,7 +25,9 @@
     "npm run build",
     "desktop browser play",
     "Android browser play",
-    "human visual acceptance"
+    "human visual acceptance",
+    "GitHub Pages public URL HTTP load",
+    "deployed browser interaction smoke"
   ],
   "acceptance": {
     "periscopeHeading": true,
