@@ -104,6 +104,7 @@ function splitActions(section){
   return out;
 }
 function classify(raw){
+  if(/\b(?:heading|face|orient|align|point us|square us|bring us around)\b/.test(raw))return "HEADING";
   if(/\b(?:turn|steer|rotate|pivot)\s+(?:us\s+)?(?:to|towards?|onto)\s+(?:bearing|azimuth|heading|north|south|east|west|\d)/.test(raw))return "HEADING";
   const found=vocabulary.filter(([,rx])=>rx.test(raw)).map(([action])=>action);
   if(!found.length){
@@ -115,7 +116,7 @@ function classify(raw){
   return found[0];
 }
 function conditionFrom(raw){
-  const m=raw.match(/\b(when|once|until|if)\s+(.+)$/);
+  const m=raw.match(/\b(when|once|until|if|after)\s+(.+)$/);
   if(!m)return {main:raw,condition:null,error:null};
   const main=raw.slice(0,m.index).trim(),tail=m[2].trim();
   if(/\b(?:gunner|beta)\b.*\b(?:locked|laid|on target|ready)\b|\bgun(?:\s+is)?\s+laid\b/.test(tail))
@@ -180,6 +181,9 @@ export function parseTransmission(input,prior={}){
    const distance=["ADVANCE","REVERSE"].includes(action)?parseAmount(main,"distance"):null;
    const bearing=["SPOT","HEADING"].includes(action)?bearingOf(main):null;
    const ammo=action==="LOAD"?ammoOf(main):null;
+   const speedProfile=/\b(slowly|carefully|cautiously|crawl)\b/.test(main)?"SLOW":/\b(full speed|quickly|rapidly|fast|maximum speed)\b/.test(main)?"FAST":"NORMAL";
+   const destination=["ADVANCE","REVERSE"].includes(action)?main.match(/\b(?:to|toward|towards|up to|past|through|across)\s+(?:the\s+)?(orchard|hedge|hedgerow|house|farmhouse|road|tree line|enemy)\b/)?.[1]||null:null;
+   if(destination){errors.push({code:"ROUTE_UNAVAILABLE",clause:raw,target:destination,detail:"Destination understood, but autonomous navigation is not yet implemented."});continue;}
    if(["TURN","TRAVERSE"].includes(action)&&!direction){errors.push({code:"MISSING_DIRECTION",clause:raw});continue;}
    if(["TURN","TRAVERSE"].includes(action)&&/\b(left|port)\b/.test(main)&&/\b(right|starboard)\b/.test(main)){errors.push({code:"CONTRADICTORY_DIRECTIONS",clause:raw});continue;}
    if(["TURN","TRAVERSE","HEADING"].includes(action)&&/\b(?:meters?|metres?|yards?|feet|foot)\b/.test(main)){errors.push({code:"INVALID_UNIT",clause:raw});continue;}
@@ -192,7 +196,7 @@ export function parseTransmission(input,prior={}){
    if(condition?.mode==="UNTIL"&&!["ADVANCE","REVERSE","TURN","TRAVERSE"].includes(action)){errors.push({code:"INVALID_UNTIL",clause:raw});continue;}
    const relation=frames.length===0?"FIRST":j===0?section.relation:"CONCURRENT";
    const index=frames.length;
-   frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,condition,relation,
+   frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
     dependencies:relation==="AFTER"?[{type:"AFTER_FRAME",frame:index-1}]:[],raw});
   }
  }
