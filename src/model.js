@@ -37,7 +37,7 @@ export function command(g,input){
   const d=c.match(/\b(left|right)\b/);if(d){const magnitude=c.match(/\b(\d+(?:\.\d+)?)\s*(?:degrees?|deg)?\b/);const spoken=c.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|fifteen|twenty|thirty|forty|forty five|ninety|one hundred|one eighty)\b/);const numbers={one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,fifteen:15,twenty:20,thirty:30,forty:40,'forty five':45,ninety:90,'one hundred':100,'one eighty':180};const degrees=magnitude?Number(magnitude[1]):spoken?numbers[spoken[1]]:null;if(degrees!==null&&(!Number.isFinite(degrees)||degrees<=0||degrees>360))return 'Delta: Specify a turn from 1 to 360 degrees.';p.turn=d[1]==='left'?-22:22;p.turnRemaining=degrees;return 'Delta: Turning '+d[1]+(degrees===null?' until ordered to halt.':' '+degrees+' degrees.');}
  }
  // Commander bearing callouts are references, not magical target acquisition.
- const clock=c.match(/\b(?:at|on|bearing|target|enemy|contact)?\s*(1[0-2]|[1-9])\s*o\s*clock\b/);
+ const clock=c.match(/\b(?:at|on|bearing|target|enemy|contact)?\s*(1[0-2]|[1-9])\s*o\s*'?\s*clock\b/);
  const absolute=c.match(/\b(?:bearing|azimuth|heading)\s*(\d{1,3})\s*(?:degrees?|deg)?\b/);
  const vague=c.match(/\b(ahead|forward|front|left|right|behind|rear|back)\b/);
  if((clock||absolute||vague)&&/\b(beta|gunner|silver|contact|target|enemy|panzer|spot|designate|bearing|azimuth)\b/.test(c)){
