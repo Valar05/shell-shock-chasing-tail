@@ -34,14 +34,20 @@ export function move(tank,speed,dt,g=null){
  }
  const hedge=obstacles.find(o=>o.type==='hedge'&&intersectRect(x,z,o,5));
  const effectiveSpeed=houseId>=0?speed*.18:hedge?speed*.28:speed;
- tank.x=tank.x+Math.sin(rad)*effectiveSpeed*dt;
- tank.z=tank.z+Math.cos(rad)*effectiveSpeed*dt;
+ const permitted=tank.moveRemaining==null?Infinity:Math.max(0,tank.moveRemaining);
+ const travel=Math.sign(effectiveSpeed)*Math.min(Math.abs(effectiveSpeed*dt),permitted);
+ tank.x+=Math.sin(rad)*travel;
+ tank.z+=Math.cos(rad)*travel;
+ if(tank.moveRemaining!=null){
+  tank.moveRemaining=Math.max(0,tank.moveRemaining-Math.abs(travel));
+  if(tank.moveRemaining<.000001){tank.moveRemaining=0;tank.moving=0;}
+ }
  tank.brushing=Boolean(hedge);
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
  return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
- player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
+ player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,moveRemaining:null,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
 export function designate(g){const p=g.player,e=g.enemy;const b=bearing(p,e);if(Math.abs(diff(g.view,b))>14||blocked(p,e,[],g.breaches))return false;g.enemySeen=true;p.aim='enemy';p.aimTime=0;return true;}
