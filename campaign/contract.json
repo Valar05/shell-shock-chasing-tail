@@ -1,0 +1,40 @@
+{
+  "id": "shell-shock-first-playable-20261024",
+  "mission": "One playable tank-command bocage encounter",
+  "status": "authoring",
+  "sourceReferences": [
+    "Valar05/through-the-slit",
+    "Valar05/tanks-for-the-memories",
+    "Valar05/truth-first-rpg"
+  ],
+  "mutablePaths": [
+    "README.md",
+    "AGENTS.md",
+    "campaign/**",
+    "index.html",
+    "package.json",
+    "src/**",
+    "tests/**",
+    ".gitignore"
+  ],
+  "lockedPaths": [],
+  "evidence": [
+    "git exact commit readback",
+    "npm test",
+    "npm run build",
+    "desktop browser play",
+    "Android browser play",
+    "human visual acceptance"
+  ],
+  "acceptance": {
+    "periscopeHeading": true,
+    "independentHullTurret": true,
+    "commanderDesignationOnly": true,
+    "gunnerAcquiresAndAims": true,
+    "loaderManagesAmmunition": true,
+    "driverExecutesMovement": true,
+    "occludingHedgerows": true,
+    "enemyCanFire": true,
+    "winLoseRestart": true
+  }
+}
