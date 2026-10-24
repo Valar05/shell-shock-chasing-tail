@@ -167,6 +167,7 @@ export function parseTransmission(input,prior={}){
     text=(text.slice(0,lead.index)+text.slice(lead.index+lead[0].length)).trim();
   }
   const atoms=splitActions(text);
+  const stageDependencies=section.relation==='AFTER'&&frames.length?[{type:'AFTER_FRAME',frame:frames.length-1}]:[];
   for(let j=0;j<atoms.length;j++){
    const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").trim();
    const {main,condition,error}=conditionFrom(raw);
@@ -197,7 +198,7 @@ export function parseTransmission(input,prior={}){
    const relation=frames.length===0?"FIRST":j===0?section.relation:"CONCURRENT";
    const index=frames.length;
    frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
-    dependencies:relation==="AFTER"?[{type:"AFTER_FRAME",frame:index-1}]:[],raw});
+    dependencies:stageDependencies.map(d=>({...d})),raw});
   }
  }
  // A THEN dependency requires the prior order to have a determinable finish.
