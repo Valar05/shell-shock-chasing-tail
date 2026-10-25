@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {createSpeechPacketizer} from './speech-packetizer.js';
 import {createFilteredSpeechInput} from './filtered-speech-input.js';
+import {createBrowserWasmRecognizer} from './wasm-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
@@ -89,58 +90,40 @@ crewAudioButton.addEventListener('click',()=>{const on=crewVoice.enable(!crewVoi
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){restartGame();return;}g.message=command(g,s);renderHud();}
 const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voice-state');
-const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-let recognition=null,listening=false,wantListening=false,restartTimer=null,starting=false,filteredUnavailable=false;
+let wantListening=false;
 const filteredInput=createFilteredSpeechInput();
-let micMode='standard';
 function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
 const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.resume();},status:msg=>voiceState.textContent=msg});
-async function startRecognition(){
- if(!wantListening||listening||starting)return;
- starting=true;
- try{
-  if(!filteredUnavailable&&filteredInput.supported()){
-   try{
-    const {track,settings}=await filteredInput.prepare();
-    if(!wantListening)return;
-    recognition.start(track);
-    micMode='filtered';
-    voiceState.textContent='Filtered mic · AEC '+(settings.echoCancellation===true?'on':'requested')+' · noise suppression '+(settings.noiseSuppression===true?'on':'requested');
-    return;
-   }catch(error){
-    filteredUnavailable=true;
-    console.warn('Filtered microphone track unavailable, using browser recognition fallback',error);
-    await filteredInput.close();
-   }
-  }
-  if(wantListening){recognition.start();micMode='standard';voiceState.textContent='Browser microphone fallback · filtered-track recognition unavailable';}
- }catch(error){updateVoice('Speech input unavailable: '+(error?.message||'check microphone permission'));}
- finally{starting=false;}
-}
-function retryListening(){if(!wantListening||listening||starting)return;clearTimeout(restartTimer);restartTimer=setTimeout(startRecognition,300);}
-if(SpeechRecognition){
- recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
- recognition.onstart=()=>{listening=true;updateVoice(micMode==='filtered'?'Filtered microphone listening':'Browser microphone listening · fallback');};
- recognition.onresult=ev=>{
- const changed=Array.from(ev.results).slice(ev.resultIndex||0);
- const text=changed.map(r=>r[0]?.transcript||'').join(' ').trim();
- if(!text)return;
- if(isCrewEcho(text)){voiceState.textContent='Ignoring crew speaker audio';return;}
- // Music or fragments of synthesized dialogue must not interrupt the radio.
- // A barge-in requires a final recognized order, or a clearly addressed
- // interim instruction. The recognizer continues listening throughout.
- const hasFinal=changed.some(r=>r.isFinal);
- const addressed=/^(?:driver|delta|gunner|beta|loader|gamma|silver|alpha|commander)\b/i.test(text);
- if(!hasFinal&&!addressed&&!/\b(?:fire|halt|stop|reverse|advance|turn|reload|traverse|acquire|report)\b/i.test(text)&&!speechPackets.pending())return;
- if(crewSpeaking&&!hasFinal&&!addressed)return;
- if(crewSpeaking&&!addressed&&!/^(?:fire|halt|stop|reverse|advance|turn|reload)\b/i.test(text))return;
- if(crewSpeaking)crewVoice.interrupt();
- speechPackets.receive(ev);
-};
- recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);filteredInput.close();}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
- recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
- mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();filteredInput.close();}});
-}else{mic.disabled=true;updateVoice('Speech recognition unavailable in this browser. Try Chrome or keyboard fallback.');}
+let partial='';
+const wasmVoice=createBrowserWasmRecognizer({
+ input:filteredInput,
+ onPartial:text=>{
+  partial=text;
+  if(!text)return;
+  if(isCrewEcho(text))return;
+  // A voiced, addressed order is required to interrupt an ongoing crew report.
+  if(crewSpeaking&&/^(driver|delta|gunner|beta|loader|gamma|silver|alpha|fire|halt|stop)\b/i.test(text))crewVoice.interrupt();
+  voiceState.textContent='Heard: '+text;
+ },
+ onFinal:text=>{
+  if(isCrewEcho(text)){voiceState.textContent='Ignoring crew speaker audio';return;}
+  if(crewSpeaking)crewVoice.interrupt();
+  // Vosk emits completed utterances rather than WebSpeech result indices.
+  const result=[{transcript:text}];result.isFinal=true;
+  speechPackets.receive({resultIndex:0,results:[result]});
+ },
+ onStatus:message=>voiceState.textContent=message
+});
+mic.addEventListener('click',async()=>{
+ if(wantListening){
+  wantListening=false;
+  speechPackets.flush();crewVoice.resume();
+  await wasmVoice.stop();updateVoice('Microphone OFF');return;
+ }
+ wantListening=true;updateVoice('Loading browser speech recognition…');
+ try{await wasmVoice.start();if(!wantListening)await wasmVoice.stop();}
+ catch(error){wantListening=false;await wasmVoice.stop();updateVoice('WASM voice failed: '+(error?.message||error));}
+});
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
 document.querySelector('#restart').addEventListener('click',restartGame);
