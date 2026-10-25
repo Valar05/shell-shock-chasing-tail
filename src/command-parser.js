@@ -290,6 +290,9 @@ export function parseTransmission(input,prior={}){
    const direction=directionOf(main);
    const degrees=["TURN","TRAVERSE"].includes(action)?parseAmount(main,"angle"):null;
    const distance=["ADVANCE","REVERSE"].includes(action)?parseAmount(main,"distance"):null;
+   // A direction attached to a tree objective is a relative target bearing,
+   // NOT a new TURN order. Preserve the exact angle in the command frame.
+   const targetOffset=action==="CRUSH_TREE"&&direction?parseAmount(main,"angle"):null;
    const bearing=["SPOT","HEADING"].includes(action)?bearingOf(main):null;
    const ammo=action==="LOAD"?ammoOf(main):null;
    const speedProfile=/\b(slowly|carefully|cautiously|crawl)\b/.test(main)?"SLOW":/\b(full speed|quickly|rapidly|fast|maximum speed)\b/.test(main)?"FAST":"NORMAL";
@@ -303,6 +306,7 @@ export function parseTransmission(input,prior={}){
    if(action==="LOAD"&&/\b(?:ap|armor.piercing|armour.piercing)\b/.test(main)&&/\b(?:he|high.explosive|smoke)\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
    if(action==="LOAD"&&/\b(?:he|high.explosive)\b/.test(main)&&/\bsmoke\b/.test(main)){errors.push({code:"CONFLICTING_AMMUNITION",clause:raw});continue;}
    if(/\band\s+(?!slowly\b|carefully\b|cautiously\b|quietly\b|steadily\b)/.test(main)){errors.push({code:"UNPARSED_CONJUNCTION",clause:raw});continue;}
+   if(targetOffset!==null&&(targetOffset<=0||targetOffset>180)){errors.push({code:"INVALID_RELATIVE_BEARING",clause:raw});continue;}
    if(degrees!==null&&(degrees<=0||degrees>360)){errors.push({code:"INVALID_ANGLE",clause:raw});continue;}
    if(distance!==null&&(distance<=0||distance>2000)){errors.push({code:"INVALID_DISTANCE",clause:raw});continue;}
    if(["SPOT","HEADING"].includes(action)&&!bearing){errors.push({code:"MISSING_BEARING",clause:raw});continue;}
@@ -310,7 +314,7 @@ export function parseTransmission(input,prior={}){
    if(condition?.mode==="UNTIL"&&!["ADVANCE","REVERSE","TURN","TRAVERSE"].includes(action)){errors.push({code:"INVALID_UNTIL",clause:raw});continue;}
    const relation=frames.length===0?"FIRST":j===0?section.relation:"CONCURRENT";
    const index=frames.length;
-   frames.push({index,kind:queryType?"QUERY":"ORDER",queryType,actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
+   frames.push({index,kind:queryType?"QUERY":"ORDER",queryType,actor,action,direction,degrees,distance,targetOffset,ammo,bearing,speedProfile,condition,relation,
     dependencies:stageDependencies.map(d=>({...d})),raw});
   }
  }
