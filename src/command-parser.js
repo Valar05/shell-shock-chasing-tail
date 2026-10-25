@@ -204,6 +204,24 @@ function classify(raw){
   // into movement plus turn upstream when another action is explicit.
   return found[0];
 }
+
+// Query recognition is adapted from Truth First v6.3 parseQuery. Questions
+// inspect information; they must NEVER accidentally trigger movement/fire.
+function queryTypeOf(raw){
+ const text=raw.trim().replace(/^,+\s*/,"");
+ if(!/^(?:who|what|where|when|why|how|can|could|are|is|do|does|did|will|would|which|report|status|sitrep|tell me)\b/.test(text))return null;
+ if(/\b(?:ammo|ammunition|rounds?|shells?|loaded|reload|loading|breech)\b/.test(text))return "AMMO";
+ if(/\b(?:heading|bearing|direction|azimuth|facing|pointing)\b/.test(text))return "HEADING";
+ if(/\b(?:speed|moving|movement|advancing|stopped|distance|driving)\b/.test(text))return "MOTION";
+ if(/\b(?:gun|laid|ready to fire|aim|lock|target acquired)\b/.test(text))return "GUN";
+ if(/\b(?:enemy|contact|panzer|opposition|hostile|threat)\b/.test(text))return "CONTACT";
+ if(/\b(?:see|seeing|visible|look|spot|eyes on)\b/.test(text))return "OBSERVATION";
+ if(/\b(?:options|orders|commands|can we|can you|capable)\b/.test(text))return "CAPABILITY";
+ if(/\b(?:objective|mission)\b/.test(text))return "OBJECTIVE";
+ if(/\b(?:report|status|sitrep|how are we|how's the tank)\b/.test(text))return "STATUS";
+ return "STATUS";
+}
+
 function conditionFrom(raw){
   const m=raw.match(/\b(when|once|until|if|after)\s+(.+)$/);
   if(!m)return {main:raw,condition:null,error:null};
@@ -259,13 +277,14 @@ export function parseTransmission(input,prior={}){
   const stageDependencies=section.relation==='AFTER'&&frames.length?[{type:'AFTER_FRAME',frame:frames.length-1}]:[];
   for(let j=0;j<atoms.length;j++){
    const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").replace(/\s+(?:and|then)\s*$/,"").trim();
-   const {main,condition,error}=conditionFrom(raw);
+   const queryType=queryTypeOf(raw);
+   const {main,condition,error}=queryType?{main:raw,condition:null,error:null}:conditionFrom(raw);
    if(error){errors.push({...error,clause:raw});continue;}
-   const action=classify(main);
+   const action=queryType?"REPORT":classify(main);
    if(!action){errors.push({code:"UNKNOWN_ACTION",clause:raw});continue;}
-   const actor=lead?focusActor:ROLES[action]||focusActor;
+   const actor=queryType?(lead?focusActor:"silver"):(lead?focusActor:ROLES[action]||focusActor);
    if(!actor){errors.push({code:"MISSING_ACTOR",clause:raw});continue;}
-   if(actor!==ROLES[action]&&!(action==="SPOT"&&["alpha","beta","silver"].includes(actor))){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
+   if(!queryType&&actor!==ROLES[action]&&!(action==="SPOT"&&["alpha","beta","silver"].includes(actor))){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
    const direction=directionOf(main);
    const degrees=["TURN","TRAVERSE"].includes(action)?parseAmount(main,"angle"):null;
    const distance=["ADVANCE","REVERSE"].includes(action)?parseAmount(main,"distance"):null;
@@ -289,7 +308,7 @@ export function parseTransmission(input,prior={}){
    if(condition?.mode==="UNTIL"&&!["ADVANCE","REVERSE","TURN","TRAVERSE"].includes(action)){errors.push({code:"INVALID_UNTIL",clause:raw});continue;}
    const relation=frames.length===0?"FIRST":j===0?section.relation:"CONCURRENT";
    const index=frames.length;
-   frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
+   frames.push({index,kind:queryType?"QUERY":"ORDER",queryType,actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
     dependencies:stageDependencies.map(d=>({...d})),raw});
   }
  }
