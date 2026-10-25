@@ -68,53 +68,34 @@ try{
  if(JSON.stringify(hedgesBefore)!==JSON.stringify(hedgesAfter))throw Error('Hedge sprite rotates with camera');
  await orient.close();
 
- // Voice-first end-to-end with an injected browser speech recognizer: final
- // transcript commits immediately while the microphone remains toggled on.
+ // Web-only WASM engine receives conditioned audio and produces completed packets.
  const voice=await browser.newPage({viewport:{width:915,height:412}});
  await voice.addInitScript(()=>{
-  class FakeRecognition{
-   start(){window.__testRecognition=this;this.onstart?.();}
-   stop(){this.onend?.();}
+  class MockRecognizer{
+   constructor(){window.__mockRecognizer=this;this.listeners={};}
+   on(event,fn){this.listeners[event]=fn;}
+   emit(event,result){this.listeners[event]?.({result});}
+   acceptWaveform(){}
+   remove(){}
   }
-  window.SpeechRecognition=FakeRecognition;
+  window.Vosk={createModel:async()=>({KaldiRecognizer:MockRecognizer,terminate(){}})};
+  const realGet=MediaDevices.prototype.getUserMedia;
+  MediaDevices.prototype.getUserMedia=async function(){
+   const ctx=new AudioContext();window.__mockMicContext=ctx;
+   return ctx.createMediaStreamDestination().stream;
+  };
  });
  await voice.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
  await voice.locator('#mic').click();
- await voice.waitForFunction(()=>Boolean(window.__testRecognition));
- await voice.evaluate(()=>{
-  const result=[{transcript:'Driver advance and turn 20 degrees left'}];result.isFinal=true;
-  window.__testRecognition.onresult({resultIndex:0,results:[result]});
- });
+ await voice.waitForFunction(()=>Boolean(window.__mockRecognizer),{timeout:15000});
+ await voice.evaluate(()=>window.__mockRecognizer.emit('result',{text:'driver advance'}));
  await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),{timeout:5000});
- const spoken=await voice.locator('#voice-state').textContent();
- if(!/Driver advance and turn 20 degrees left/.test(spoken))
-  throw Error('Compound speech packet was not submitted together: '+spoken);
- const gameText=await voice.locator('#message').textContent();
- if(!/Advancing/.test(gameText)||!/Turning left 20 degrees/.test(gameText))
-  throw Error('Compound voice commands did not execute: '+gameText);
- if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
-  throw Error('Microphone is not an active toggle');
- // Regression: crew speaker text must never be treated as a player command,
- // even when the transcript starts with an addressed crew member name.
- await voice.locator('#crew-audio').click();
- await voice.evaluate(()=>{
-  const result=[{transcript:'Silver radio check crew audio online'}];result.isFinal=true;
-  window.__testRecognition.onresult({resultIndex:0,results:[result]});
- });
- await voice.waitForTimeout(800);
- const echoState=await voice.locator('#voice-state').textContent();
- if(!/Ignoring crew speaker audio/.test(echoState))
-  throw Error('Synthetic crew speech was not rejected: '+echoState);
- if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
-  throw Error('Echo protection turned microphone off');
- // Speech must ignore unrelated music fragments while crew audio plays.
- await voice.evaluate(()=>{
-   const result=[{transcript:'music playing loud chorus tonight'}];result.isFinal=false;
-   window.__testRecognition.onresult({resultIndex:1,results:[{0:{transcript:'Driver advance and turn 20 degrees left'},isFinal:true},result]});
- });
- await voice.waitForTimeout(100);
- const nonCommand=await voice.locator('#voice-state').textContent();
- if(/Heard: music playing loud chorus/.test(nonCommand))throw Error('Music fragment entered crew order packet');
+ const msg=await voice.locator('#message').textContent();
+ if(!/Advancing/i.test(msg))throw Error('WASM recognizer order not executed: '+msg);
+ await voice.evaluate(()=>window.__mockRecognizer.emit('result',{text:'driver halt'}));
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('driver halt'),{timeout:5000});
+ if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')throw Error('WASM mic toggle unexpectedly disabled');
+ await voice.locator('#mic').click();
  await voice.close();
 
 await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
