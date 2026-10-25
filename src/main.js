@@ -131,6 +131,7 @@ if(SpeechRecognition){
  // interim instruction. The recognizer continues listening throughout.
  const hasFinal=changed.some(r=>r.isFinal);
  const addressed=/^(?:driver|delta|gunner|beta|loader|gamma|silver|alpha|commander)\b/i.test(text);
+ if(!hasFinal&&!addressed&&!/\b(?:fire|halt|stop|reverse|advance|turn|reload|traverse|acquire|report)\b/i.test(text)&&!speechPackets.pending())return;
  if(crewSpeaking&&!hasFinal&&!addressed)return;
  if(crewSpeaking&&!addressed&&!/^(?:fire|halt|stop|reverse|advance|turn|reload)\b/i.test(text))return;
  if(crewSpeaking)crewVoice.interrupt();
