@@ -66,3 +66,26 @@ test('three seconds remain the fallback for unresolved interim',()=>{
  h.c.advance(2999);assert.deepEqual(h.submitted,[]);
  h.c.advance(2);assert.deepEqual(h.submitted,['Driver advanced and turn twenty degrees left']);
 });
+
+test('overlapping recognition hypotheses are coalesced instead of multiplied',()=>{
+ const h=harness();
+ h.p.receive({resultIndex:0,results:[h.result('driver run over',true)]});
+ h.p.receive({resultIndex:1,results:[h.result('driver run over',true),h.result('driver run over that tree',true)]});
+ assert.equal(h.p.pending(),'driver run over that tree');
+ h.c.advance(3001);
+ assert.deepEqual(h.submitted,['driver run over that tree']);
+});
+test('new results never replay slots previously dispatched',()=>{
+ const h=harness();
+ h.p.receive({resultIndex:0,results:[h.result('Driver halt',true)]});
+ h.c.advance(421);
+ h.p.receive({resultIndex:1,results:[h.result('Driver halt',true),h.result('Gamma load AP',true)]});
+ h.c.advance(421);
+ assert.deepEqual(h.submitted,['Driver halt','Gamma load AP']);
+});
+test('interim replacement with cumulative transcript does not duplicate prefix',()=>{
+ const h=harness();
+ h.p.receive({resultIndex:0,results:[h.result('driver advance',true),h.result('driver advance and turn right',false)]});
+ assert.equal(h.p.pending(),'driver advance and turn right');
+ h.p.abort();
+});
