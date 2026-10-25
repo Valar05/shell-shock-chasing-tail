@@ -134,6 +134,31 @@ export function parseAmount(raw,kind){
   if(kind==="angle")return numeric(raw);
   return null;
 }
+
+// Directly adapted from Truth First v6.3 parser.mjs splitActorSubjects.
+// Multiple named recipients may be spoken without explicit punctuation.
+// The guard keeps subordinate subjects ("when Gunner reports locked") inside
+// the parent condition rather than inventing another instruction.
+function splitActorSubjects(chunk){
+ const mentions=[...chunk.matchAll(subjectRx)];
+ const starts=[];
+ for(const m of mentions){
+  const before=chunk.slice(0,m.index);
+  if(/\b(?:when|once|until|if)\s*$/i.test(before))continue;
+  if(/\b(?:when|once|until|if)\b[^;.!?]*$/i.test(before))continue;
+  starts.push(m.index);
+ }
+ if(starts.length<=1)return [chunk.trim()].filter(Boolean);
+ const out=[];
+ for(let i=0;i<starts.length;i++){
+  const piece=chunk.slice(starts[i],i+1<starts.length?starts[i+1]:chunk.length).replace(/^[,\s]+|[,\s]+$/g,"").trim();
+  if(piece)out.push(piece);
+ }
+ const prefix=chunk.slice(0,starts[0]).trim();
+ if(prefix&&out.length)out[0]=(prefix+" "+out[0]).trim();
+ return out;
+}
+
 function splitSections(text){
   // Preserve connectors as graph edges. "and" between two verbs stays inside
   // a concurrent packet; "then" creates an explicit dependency.
@@ -148,7 +173,7 @@ function splitSections(text){
     }
     out.push({text:part.trim(),relation});relation="CONCURRENT";
   }
-  return out;
+  return out.flatMap(section=>splitActorSubjects(section.text).map((part,i)=>({text:part,relation:i===0?section.relation:'CONCURRENT'})));
 }
 function splitActions(section){
   const matches=[...section.matchAll(ACTION_START)];
