@@ -32,7 +32,7 @@ for key,phrase in cases.items():
   st.input_finished()
   while recognizer.is_ready(st):recognizer.decode_stream(st)
   result=recognizer.get_result(st)
-  transcript=str(result.text)
+  transcript=str(result.text if hasattr(result, 'text') else result)
   row={'case':key,'trial':i+1,'expected':phrase,'transcript':transcript,'decodeMs':round((time.perf_counter()-t)*1000),'audioMs':round(len(samples)/rate*1000),'engine':'sherpa-onnx-20M-int8','input':'eSpeak full WAV'}
   rows.append(row);print('SHERPA_TRIAL='+json.dumps(row),flush=True)
 Path('artifacts/sherpa-results.json').write_text(json.dumps(rows,indent=2))
