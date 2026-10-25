@@ -111,7 +111,9 @@ try{
  await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Ignoring crew speaker audio'),null,{timeout:5000});
  // Distinct valid commander orders must remain available without a prefix.
  await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'commander',text:'advance'}}));
- await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Command sent: advance'),null,{timeout:5000});
+ await voice.waitForTimeout(150);
+ const barge=await voice.evaluate(()=>({status:document.querySelector('#voice-state')?.textContent,game:document.querySelector('#message')?.textContent}));
+ if(!/Command sent: advance/.test(barge.status))throw Error('Valid unaddressed barge-in was rejected: '+JSON.stringify(barge));
  if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')throw Error('Mic toggle unexpectedly disabled');
  await voice.locator('#mic').click();
  await voice.close();
