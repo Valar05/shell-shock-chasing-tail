@@ -1,0 +1,40 @@
+{
+  "campaign_id": "shell-shock-voice-field-candidate-20261025",
+  "baseline_sha": "7bed4a118650d6b67311221fede17d91683644e5",
+  "mission": "Validate the browser-only Shell Shock voice field-test candidate with one GitHub-hosted deterministic script and receipts; never infer human microphone acceptance.",
+  "rules": [
+    "AGENTS.md",
+    "Drive CAMPAIGN_ETIQUETTE",
+    "Canonical Shell Shock GDD"
+  ],
+  "allowed_paths": [
+    "campaign/voice-field-campaign.json",
+    "scripts/voice-field-campaign.mjs",
+    ".github/workflows/pages.yml"
+  ],
+  "locked_game_paths": [
+    "src/**",
+    "tests/**",
+    "index.html",
+    "package.json"
+  ],
+  "entrypoint": "node scripts/voice-field-campaign.mjs verify",
+  "execution_lane": "GitHub Pages workflow after build, gameplay browser smoke, successful deployment, and real human WAV-to-Moonshine browser inference",
+  "required_upstream_steps": [
+    "npm test",
+    "npm run build -- --base=/shell-shock-chasing-tail/",
+    "node tests/browser-smoke.mjs",
+    "GitHub Pages deploy",
+    "SHELL_SHOCK_TEST_URL=<deployed URL> node tests/voice-real-smoke.mjs"
+  ],
+  "receipt": "artifacts/voice-field-campaign.json",
+  "checks": [
+    "exact GITHUB_SHA and GITHUB_RUN_ID",
+    "production index + service worker + compiled wasm present",
+    "public URL returns HTML and app boot marker",
+    "canonical asset paths are relative to /shell-shock-chasing-tail/",
+    "no test injection in production bundle"
+  ],
+  "stop_policy": "one verification pass; bounded network checks; fail and record precise blocker; no automatic edits, retriggering, or deployment retries",
+  "acceptance_boundary": "Automated candidate only. Real physical mobile mic/music/crew-echo/barge-in evaluation and human acceptance remain pending."
+}
