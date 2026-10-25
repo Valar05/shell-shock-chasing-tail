@@ -67,7 +67,7 @@ test('stale interrupted threat is dropped after target destroyed',()=>{
  let alive=true;const utterances=[];
  class U{constructor(text){this.text=text;}}
  const synth={speaking:false,pending:false,getVoices:()=>[],addEventListener(){},speak(u){utterances.push(u)},cancel(){}};
- const voice=createCrewVoice({synthesis:synth,Utterance:U,isRelevant:l=>alive||!/contact|threat|enemy|panzer/i.test(l.text)});
+ const voice=createCrewVoice({synthesis:synth,Utterance:U,isRelevant:l=>alive||l.id==='beta.destroyed'});
  voice.enable(true);
  voice.say({id:'beta.contact',speaker:'beta',priority:4,text:'Panzer in my sights, bearing forty.'});
  voice.interrupt();
