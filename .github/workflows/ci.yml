@@ -28,10 +28,16 @@ jobs:
           sudo apt-get install -y espeak-ng
           node tests/whisper-real-audio.mjs
           node tests/whisper-integrated-mic.mjs
+      - name: Repeated actual-audio reliability benchmark (research)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y espeak-ng
+          VOICE_TRIALS=5 node tests/voice-reliability.mjs | tee /tmp/voice-reliability.log
       - uses: actions/upload-artifact@v4
         with:
           name: shell-shock-web-build
           path: |
             dist/
             artifacts/
+            /tmp/voice-reliability.log
           if-no-files-found: error
