@@ -2,19 +2,6 @@
 // filtered-speech-input.js; this adapter never accesses the default microphone.
 const SCRIPT='https://cdn.jsdelivr.net/npm/vosk-browser@0.0.5/dist/vosk.js';
 const MODEL='https://fiddle-app.github.io/voice-models/vosk-model-small-en-us-0.15.tar.gz';
-// Domain vocabulary steers a compact acoustic model toward likely tank orders.
-// [unk] keeps unusual/free-form commander speech possible.
-const GRAMMAR=JSON.stringify([
- '[unk]','driver','gunner','loader','silver','delta','beta','gamma',
- 'advance','halt','stop','reverse','turn left','turn right','fire',
- 'load ap','load he','reload','acquire target','report','status report',
- 'run over that tree','driver run over that tree','run over the tree',
- 'knock down that tree','crush that tree','flatten that tree',
- 'go forward','drive forward','hold fire','enemy ahead','enemy to the right',
- 'gunner fire','loader load ap','driver advance','driver halt',
- 'what do you see','where is the enemy','turn ten degrees left',
- 'turn twenty degrees right','run over that tree over there'
-]);
 let loader=null;
 function loadVosk(){
  if(globalThis.Vosk?.createModel)return Promise.resolve(globalThis.Vosk);
@@ -41,7 +28,7 @@ export function createBrowserWasmRecognizer({input,onPartial=()=>{},onFinal=()=>
   context=new A();
   // Read the already filtered track, NOT the unprocessed microphone.
   source=context.createMediaStreamSource(new MediaStream([track]));
-  recognizer=new model.KaldiRecognizer(context.sampleRate,GRAMMAR);
+  recognizer=new model.KaldiRecognizer(context.sampleRate);
   recognizer.on('partialresult',event=>onPartial(event.result?.partial||''));
   recognizer.on('result',event=>{const transcript=event.result?.text?.trim();if(transcript)onFinal(transcript);});
   processor=context.createScriptProcessor(4096,1,1);
