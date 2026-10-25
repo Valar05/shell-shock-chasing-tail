@@ -13,7 +13,7 @@ const clipPath=entries.find(x=>/(?:^|\/)stop\/[^/]+\.wav$/.test(x));
 if(!clipPath)throw Error('Human speech STOP sample missing in mini dataset');
 const sample=execFileSync('unzip',['-p',zip,clipPath],{maxBuffer:200000}).toString('base64');
 const remoteUrl=process.env.SHELL_SHOCK_TEST_URL||'';
-const localUrl='http://127.0.0.1:4183/shell-shock-chasing-tail/';
+const localUrl='http://127.0.0.1:4183/shell-shock-chasing-tail/?voice=moonshine';
 const server=remoteUrl?null:spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--base','/shell-shock-chasing-tail/','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
 try{
