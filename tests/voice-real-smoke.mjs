@@ -13,7 +13,7 @@ try{
  for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4183')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
  const page=await browser.newPage({viewport:{width:1000,height:700}});
- const errors=[];page.on('pageerror',e=>errors.push(String(e)));
+ const errors=[],network=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});page.on('requestfailed',request=>network.push({url:request.url(),error:request.failure()?.errorText}));page.on('response',response=>{if(response.status()>=400)network.push({url:response.url(),status:response.status()});});
  await page.addInitScript(base64=>{
   window.__speechFixture=base64;
   window.__voiceCaptureRequests=[];
@@ -35,10 +35,10 @@ try{
  await page.goto('http://127.0.0.1:4183/',{waitUntil:'domcontentloaded'});
  await page.locator('#mic').click();
  try{
-  await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),null,{timeout:180000});
+  await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),null,{timeout:90000});
  }catch(error){
   const diagnostic=await page.evaluate(()=>({status:document.querySelector('#voice-state')?.textContent||null,requests:window.__voiceCaptureRequests||[],location:location.href}));
-  throw Error('Actual model did not reach ready state: '+JSON.stringify(diagnostic)+' / '+error.message);
+  throw Error('Actual model did not reach ready state: '+JSON.stringify({...diagnostic,errors:errors.slice(-8),network:network.slice(-8)})+' / '+error.message);
  }
  const started=Date.now();
  await page.evaluate(()=>window.__playSpeech());
