@@ -49,7 +49,7 @@ test('commander interruption re-evaluates full crew report after reply',()=>{
  voice.resume();
  assert.equal(utterances[1].text,'Turning left, sir.');
  utterances[1].onend();
- assert.equal(utterances[2].text,'Enemy tank moving behind the farmhouse at two o clock.');
+ assert.equal(utterances.length,2,'obsolete equal-priority report should yield');
  assert.equal(voice.interrupted,false);
 });
 test('cancelled synthesis callbacks cannot complete replacement audio',()=>{
