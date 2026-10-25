@@ -92,7 +92,7 @@ try{
    return dest.stream;
   };
  });
- await voice.goto('http://127.0.0.1:4173/?voice-test=1',{waitUntil:'networkidle'});
+ await voice.goto('http://127.0.0.1:4173/?voice-test=1&voice=moonshine',{waitUntil:'networkidle'});
  await voice.locator('#mic').click();
  await voice.waitForFunction(()=>window.__voiceSamples>4096,{timeout:15000});
  await voice.evaluate(()=>{

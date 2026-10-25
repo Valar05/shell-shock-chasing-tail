@@ -22,6 +22,12 @@ jobs:
       - run: node tests/browser-smoke.mjs
       - run: npm run build -- --base=/shell-shock-chasing-tail/
       - run: node tests/voice-real-smoke.mjs
+      - name: Whisper synthetic real-WAV benchmark (research only)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y espeak-ng
+          node tests/whisper-real-audio.mjs
+          node tests/whisper-integrated-mic.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: shell-shock-web-build

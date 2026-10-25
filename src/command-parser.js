@@ -181,6 +181,14 @@ function splitSections(text){
   return out.flatMap(section=>splitActorSubjects(section.text).map((part,i)=>({text:part,relation:i===0?section.relation:'CONCURRENT'})));
 }
 function splitActions(section){
+  // Exact command: "30 degrees to the left and run over that tree".
+  // A standalone directional quantity followed by an imperative forms two clauses.
+  const implicit=section.match(/^((?:\d+|[a-z -]+)\s+degrees?\s+to\s+the\s+(?:left|right))\s+and\s+(.+)$/);
+  if(implicit){
+    ACTION_START.lastIndex=0;
+    if(ACTION_START.test(implicit[2])){ACTION_START.lastIndex=0;return [implicit[1],implicit[2]];}
+    ACTION_START.lastIndex=0;
+  }
   const matches=[...section.matchAll(ACTION_START)];
   const starts=[];
   for(const m of matches){
