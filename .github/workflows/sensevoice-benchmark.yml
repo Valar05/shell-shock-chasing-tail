@@ -1,0 +1,36 @@
+name: Sherpa SenseVoice accuracy research
+on:
+  pull_request:
+    paths: ['research/sherpa-benchmark/**','.github/workflows/sensevoice-benchmark.yml']
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  accuracy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - run: python -m pip install --disable-pip-version-check numpy sherpa-onnx
+      - run: sudo apt-get update -qq && sudo apt-get install -y espeak-ng
+      - name: Fetch SenseVoice INT8
+        run: |
+          curl -fL --retry 3 -o /tmp/sense.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17.tar.bz2
+          tar xf /tmp/sense.tar.bz2
+          ls -lh sherpa-onnx-sense-voice-zh-en-ja-ko-yue-2024-07-17/model.int8.onnx
+      - name: Generate same 5 reference files and test small Zipformer
+        run: |
+          curl -fL --retry 3 -o /tmp/zipformer.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2
+          tar xf /tmp/zipformer.tar.bz2
+          python research/sherpa-benchmark/benchmark.py
+      - name: Evaluate SenseVoice on identical audio
+        run: python research/sherpa-benchmark/sensevoice.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sherpa-sensevoice-evaluation
+          path: |
+            artifacts/sherpa-results.json
+            artifacts/sensevoice-results.json
+          if-no-files-found: warn
