@@ -1,7 +1,7 @@
 import {classifyCrewMessage} from './crew-dialogue.js';
 
 // The browser voice backend is intentionally replaceable with recorded Pocket TTS.
-export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,onState=()=>{}}={}){
+export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,onState=()=>{},isRelevant=()=>true}={}){
  let enabled=false,voiceMap={},lastKey='',lastTime=0,activePriority=0,active=false,queue=[];
  let current=null,suspended=null,interrupted=false,generation=0;
  const available=()=>Boolean(synthesis&&Utterance);
@@ -15,6 +15,7 @@ export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=
  function advanceQueue(){
   active=false;activePriority=0;current=null;
   if(interrupted){onState('interrupted');return;}
+  while(queue.length&&!isRelevant(queue[0]))queue.shift();
   if(queue.length&&enabled){const next=queue.shift();say(next,true);}
   else onState(enabled?'ready':'off');
  }
@@ -60,11 +61,12 @@ export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=
  function resume(){
   if(!interrupted)return false;
   interrupted=false;
-  if(suspended){
+  if(suspended&&isRelevant(suspended)){
    // New command acknowledgments queued during interruption speak first.
    // The subordinate then finishes the interrupted report.
    queue.push(suspended);suspended=null;
   }
+  while(queue.length&&!isRelevant(queue[0]))queue.shift();
   if(!active&&queue.length)say(queue.shift(),true);
   else onState(enabled?'ready':'off');
   return true;
