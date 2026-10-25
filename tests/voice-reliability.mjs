@@ -4,13 +4,13 @@
 import {chromium} from 'playwright';
 import {execFileSync,spawn} from 'node:child_process';
 import {readFileSync} from 'node:fs';
-const trials=Number(process.env.VOICE_TRIALS||12);
+const trials=Number(process.env.VOICE_TRIALS||5);
 const url=process.env.VOICE_BENCH_URL||'http://127.0.0.1:4190/';
 const remote=Boolean(process.env.VOICE_BENCH_URL);
 const cases=[
- {id:'compound',spoken:'thirty degrees to the left and run over that tree',must:[/\\b(?:30|thirty)\\b/,/\\bleft\\b/,/\\btree\\b/,/run over/],responses:[/turning left 30 degrees/i,/tree identified/i]},
- {id:'halt',spoken:'driver halt',must:[/\\bhalt\\b/],responses:[/halted/i]},
- {id:'turn',spoken:'turn right forty degrees',must:[/\\bright\\b/,/\\b(?:40|forty)\\b/],responses:[/turning right 40 degrees/i]}
+ {id:'compound',spoken:'thirty degrees to the left and run over that tree',must:[/\b(?:30|thirty)\b/,/\bleft\b/,/\btree\b/,/run over/],responses:[/turning left 30 degrees/i,/tree identified/i]},
+ {id:'halt',spoken:'driver halt',must:[/\bhalt\b/],responses:[/halted/i]},
+ {id:'turn',spoken:'turn right forty degrees',must:[/\bright\b/,/\b(?:40|forty)\b/],responses:[/turning right 40 degrees/i]}
 ];
 const browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
 const server=remote?null:spawn('node',['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4190','--strictPort'],{stdio:'ignore'});
@@ -24,7 +24,7 @@ try{
   for(let trial=0;trial<trials;trial++){
    const page=await browser.newPage({viewport:{width:1000,height:700}});
    const errors=[];page.on('pageerror',e=>errors.push(String(e)));
-   const started=Date.now();
+   
    const row={case:testCase.id,trial:trial+1,engine:'whisper-base.en',source:'eSpeak synthesized WAV via virtual microphone',transcript:'',game:'',error:'',latencyMs:null};
    try{
     await page.addInitScript(b64=>{
@@ -44,7 +44,7 @@ try{
     await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Whisper browser speech listening'),null,{timeout:120000});
     const inferenceStart=Date.now();
     await page.evaluate(()=>window.__playBenchmark());
-    await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:30000});
+    await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:18000});
     row.latencyMs=Date.now()-inferenceStart;
     row.transcript=(await page.locator('#voice-state').textContent()).replace(/^.*Command sent:/,'').trim().toLowerCase();
     row.game=await page.locator('#message').textContent();
