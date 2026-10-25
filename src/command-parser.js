@@ -77,6 +77,8 @@ function correction(word){
  return found.length===1?found[0]:word;
 }
 export function normalizeCommandSlots(text){
+ // A question is information seeking. Never fuzzy-map its words to orders.
+ if(/^(?:(?:driver|delta|gunner|beta|loader|gamma|silver|radio|observer|alpha|commander)\s+)?(?:who|what|where|when|why|how|can|could|are|is|do|does|did|will|would|which|tell me)\b/.test(text))return text;
  // Only words in a plausible action position after an actor or a connector
  // are candidates for fuzzy repair. All other words remain literal.
  const parts=text.split(/(\s+)/);
