@@ -88,3 +88,23 @@ test('generated corpus deterministic in 20 runs',()=>{
   for(let i=0;i<20;i++)assert.equal(JSON.stringify(parseTransmission(item.text)),receipt);
  }
 });
+
+test('reference v6.3 actor splitting handles natural unpunctuated multi-recipient speech',()=>{
+ const cases=[
+  ['Driver advance Gamma load AP',['ADVANCE','LOAD']],
+  ['Silver report Driver halt',['REPORT','HALT']],
+  ['Driver turn left ten degrees Gunner traverse right fifteen degrees',['TURN','TRAVERSE']],
+  ['Gamma load HE Beta acquire and fire',['LOAD','ACQUIRE','FIRE']],
+ ];
+ for(const [speech,actions] of cases){
+  const p=parseTransmission(speech);
+  assert.equal(p.ok,true,JSON.stringify(p));
+  assert.deepEqual(p.frames.map(x=>x.action),actions);
+ }
+});
+test('v6.3 actor splitting never splits a subordinate gunner condition',()=>{
+ const p=parseTransmission('Driver halt when gunner reports locked');
+ assert.equal(p.ok,true,JSON.stringify(p));
+ assert.deepEqual(p.frames.map(x=>x.action),['HALT']);
+ assert.equal(p.frames[0].condition.type,'GUNNER_LOCKED');
+});
