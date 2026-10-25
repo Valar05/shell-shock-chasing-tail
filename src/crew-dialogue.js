@@ -1,6 +1,8 @@
 // Canonical dialogue IDs. Audio backend is replaceable without changing game rules.
 // Stable IDs become Pocket TTS filenames later: crew/<speaker>/<id>.wav.
 export const CREW_LINES=Object.freeze({
+ 'delta.contact':{speaker:'delta',priority:4,text:'Armor ahead! Bearing {bearing}, roughly {range} meters!'},
+ 'beta.contact':{speaker:'beta',priority:4,text:'Panzer in my sights! Bearing {bearing}, roughly {range} meters!'},
  'delta.advance':{speaker:'delta',priority:1,text:'Advancing, sir.'},
  'delta.reverse':{speaker:'delta',priority:1,text:'Reversing.'},
  'delta.halt':{speaker:'delta',priority:1,text:'Halted.'},
@@ -38,6 +40,8 @@ export function makeCrewLine(id,values={}){
 }
 export function classifyCrewMessage(message=''){
  const m=String(message);
+ if(/Delta: Armor ahead/i.test(m))return makeCrewLine('delta.contact',{bearing:m.match(/bearing\s+(\d+)/i)?.[1]||'unknown',range:m.match(/roughly\s+(\d+)/i)?.[1]||'unknown'});
+ if(/Beta: Panzer in my sights/i.test(m))return makeCrewLine('beta.contact',{bearing:m.match(/bearing\s+(\d+)/i)?.[1]||'unknown',range:m.match(/roughly\s+(\d+)/i)?.[1]||'unknown'});
  if(/Delta: Turn complete/i.test(m))return makeCrewLine('delta.turn.complete');
  if(/Delta: Pushing through/i.test(m))return makeCrewLine('delta.breach');
  if(/Gamma: (AP|HE|SMOKE) loaded/i.test(m))return makeCrewLine('gamma.loaded',{ammo:m.match(/Gamma: (AP|HE|SMOKE) loaded/i)?.[1]});
