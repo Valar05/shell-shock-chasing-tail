@@ -37,7 +37,7 @@ try{
    return dest.stream;
   };
  },sample);
- await page.goto('http://127.0.0.1:4183/',{waitUntil:'domcontentloaded'});
+ await page.goto('http://127.0.0.1:4183/shell-shock-chasing-tail/',{waitUntil:'domcontentloaded'});
  await page.locator('#mic').click();
  try{
   await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),null,{timeout:90000});
