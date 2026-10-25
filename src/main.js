@@ -41,7 +41,12 @@ let crewSpeaking=false;
 function words(t){return String(t||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
 function isCrewEcho(transcript){const heard=words(transcript),spoken=words(crewVoice.speakingText);if(!heard||!spoken)return false;if(/^(?:driver|delta|gunner|beta|loader|gamma|silver|commander|alpha)\b/.test(heard))return false;return heard.length>=5&&(spoken.includes(heard)||heard.includes(spoken));}
 const crewAudioButton=document.querySelector('#crew-audio');
-const crewVoice=createCrewVoice({onState:status=>{crewSpeaking=status==='speaking';}});
+const crewVoice=createCrewVoice({onState:status=>{crewSpeaking=status==='speaking';},isRelevant:line=>{
+ if(g.finished==='Victory'&&/^(delta|beta|silver)\.(contact|lost|reacquired)$/.test(line.id))return false;
+ if(g.finished==='Defeat'&&line.priority<5)return false;
+ if(g.enemy.hp<=0&&/enemy|panzer|contact|armor|armour|threat|farmhouse/i.test(line.text)&&!/(destroyed|knocked out)/i.test(line.text))return false;
+ return true;
+}});
 if(!crewVoice.available){crewAudioButton.disabled=true;crewAudioButton.textContent='Crew audio unavailable';}
 crewAudioButton.addEventListener('click',()=>{const on=crewVoice.enable(!crewVoice.enabled);crewAudioButton.setAttribute('aria-pressed',String(on));crewAudioButton.textContent=on?'🔊 Crew voices ON':'🔇 Crew voices OFF';if(on){lastSpokenMessage='';crewVoice.feedback('Silver: Radio check. Crew audio online.');}});
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
