@@ -106,6 +106,9 @@ export function normalizeSpeech(input){
   return String(input??"").toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
     .replace(/(\d)\s*°/g,"$1 degrees")
+    // ASR naturally emits "one hundred and eighty degrees"; this "and" is
+    // part of the number, not a compound-order connector.
+    .replace(/\bhundred\s+and\s+(?=(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety)\b)/g,"hundred ")
     .replace(/\b(?:uh+|um+|please|kindly)\b/g," ")
     .replace(/\b(?:go ahead and|would you|could you|can you)\b/g," ")
     .replace(/\b(\w+)(?:\s+\1\b)+/g,"$1")
