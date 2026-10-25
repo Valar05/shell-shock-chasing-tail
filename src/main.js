@@ -17,14 +17,16 @@ const hedgeTexture=spriteTexture(x=>{x.fillStyle='#34522c';x.fillRect(0,27,128,1
 function houseTexture(breach){return spriteTexture(x=>{x.fillStyle='#8c7260';x.fillRect(8,40,112,88);x.fillStyle='#744d3e';x.beginPath();x.moveTo(0,43);x.lineTo(64,0);x.lineTo(128,43);x.fill();if(breach){x.globalCompositeOperation='destination-out';x.beginPath();x.moveTo(47,128);x.lineTo(50,80);x.lineTo(44,66);x.lineTo(53,54);x.lineTo(76,54);x.lineTo(84,69);x.lineTo(79,85);x.lineTo(83,128);x.closePath();x.fill();x.globalCompositeOperation='source-over';}});}
 function billboard(texture,w,h,x,z,y=0){const m=new THREE.Mesh(new THREE.PlaneGeometry(w,h),new THREE.MeshBasicMaterial({map:texture,transparent:true,alphaTest:.1,side:THREE.DoubleSide,depthWrite:true}));m.position.set(-x,y+h/2,z);scene.add(m);return m;}
 const environment=[];
-for(const [id,o] of obstacles.entries()){const isHouse=o.type==='house',t=isHouse?houseTexture(false):hedgeTexture;const m=billboard(t,Math.max(o.w,16),isHouse?18:7,o.x,o.z);environment.push({id,o,m,breached:false});}
-for(let i=0;i<48;i++){const x=Math.sin(i*43.17)*175,z=(i*47)%250;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+9&&Math.abs(z-o.z)<o.d/2+9))continue;billboard(treeTexture,13,18,x,z);}
+for(const [id,o] of obstacles.entries()){const isHouse=o.type==='house',t=isHouse?houseTexture(false):hedgeTexture;const m=billboard(t,Math.max(o.w,16),isHouse?18:7,o.x,o.z);if(o.type==='hedge')m.rotation.y=o.d>o.w?Math.PI/2:0;
+environment.push({id,o,m,breached:false});}
+for(let i=0;i<48;i++){const x=Math.sin(i*43.17)*175,z=(i*47)%250;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+9&&Math.abs(z-o.z)<o.d/2+9))continue;const tree=billboard(treeTexture,13,18,x,z);tree.userData.cameraFacing=true;}
 const enemySprite=billboard(tankTexture,13,11,0,0);
 function drawWorld(){const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(-e.x,5.5,e.z);
 enemySprite.lookAt(camera.position.x,5.5,camera.position.z);
-for(const item of environment){item.m.lookAt(camera.position.x,item.m.position.y,camera.position.z);if(item.o.type==='house'&&g.breaches.some(b=>b.id===item.id)&&!item.breached){item.breached=true;item.m.material.map=houseTexture(true);item.m.material.needsUpdate=true;}}
+scene.traverse(obj=>{if(obj.userData?.cameraFacing)obj.lookAt(camera.position.x,obj.position.y,camera.position.z);});
+for(const item of environment){if(item.o.type==='house'&&g.breaches.some(b=>b.id===item.id)&&!item.breached){item.breached=true;item.m.material.map=houseTexture(true);item.m.material.needsUpdate=true;}}
 camera.position.set(-g.player.x,5.8,g.player.z);const r=g.view*Math.PI/180,el=pitch*Math.PI/180;camera.lookAt(-g.player.x-Math.sin(r)*Math.cos(el)*100,5.8+Math.sin(el)*100,g.player.z+Math.cos(r)*Math.cos(el)*100);renderer.render(scene,camera);}
-if(new URLSearchParams(location.search).has('debug'))window.__shellShockDebug={view:()=>g.view,hull:()=>g.player.hull,project:(x,z)=>{const p=new THREE.Vector3(-x,5.5,z).project(camera);return {x:p.x,y:p.y}},player:()=>({x:g.player.x,z:g.player.z})};
+if(new URLSearchParams(location.search).has('debug'))window.__shellShockDebug={view:()=>g.view,hull:()=>g.player.hull,project:(x,z)=>{const p=new THREE.Vector3(-x,5.5,z).project(camera);return {x:p.x,y:p.y}},player:()=>({x:g.player.x,z:g.player.z}),hedgeRotations:()=>environment.filter(e=>e.o.type==='hedge').map(e=>e.m.rotation.y)};
 const reticle=document.createElement('div');reticle.id='reticle';reticle.innerHTML='<span>+</span><small>DRAG TO SCAN · TAP TO DESIGNATE</small>';viewport.append(reticle);
 function size(){const w=viewport.clientWidth,h=viewport.clientHeight;renderer.setSize(w,h);camera.aspect=w/h;camera.updateProjectionMatrix();}addEventListener('resize',size);size();
 let dragging=false,down=0,lastX=0,lastY=0,pitch=0;const lookSensitivity=.55;
