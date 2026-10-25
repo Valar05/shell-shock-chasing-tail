@@ -34,10 +34,15 @@ try{
  },sample);
  await page.goto('http://127.0.0.1:4183/',{waitUntil:'domcontentloaded'});
  await page.locator('#mic').click();
- await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),{timeout:180000});
+ try{
+  await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),null,{timeout:180000});
+ }catch(error){
+  const diagnostic=await page.evaluate(()=>({status:document.querySelector('#voice-state')?.textContent||null,requests:window.__voiceCaptureRequests||[],location:location.href}));
+  throw Error('Actual model did not reach ready state: '+JSON.stringify(diagnostic)+' / '+error.message);
+ }
  const started=Date.now();
  await page.evaluate(()=>window.__playSpeech());
- await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),{timeout:90000});
+ await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:90000});
  const text=await page.locator('#voice-state').textContent();
  const game=await page.locator('#message').textContent();
  if(!/Advancing/i.test(game))throw Error('Actual WAV recognition did not execute advance: '+JSON.stringify({text,game}));
