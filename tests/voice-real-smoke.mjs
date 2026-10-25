@@ -5,7 +5,7 @@ import {chromium} from 'playwright';
 import {spawn,execFileSync} from 'node:child_process';
 import {readFileSync,mkdirSync} from 'node:fs';
 const wav='/tmp/shell-shock-real-order.wav';
-execFileSync('espeak',['-v','en-us','-s','125','-w',wav,'advance']);
+execFileSync('espeak',['-v','en-us','-s','125','-w',wav,'driver advance']);
 const sample=readFileSync(wav).toString('base64');
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
