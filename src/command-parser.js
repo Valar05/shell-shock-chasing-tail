@@ -37,6 +37,66 @@ const vocabulary=[
 ];
 
 const ASR_ACTION_CORRECTIONS={advancd:"advance",advnace:"advance",advanced:"advance",advancing:"advance",advnced:"advance",advanc:"advance",trun:"turn",tern:"turn",turm:"turn",haltt:"halt",revers:"reverse",reverce:"reverse",travers:"traverse",traversed:"traverse",fier:"fire",fiire:"fire",reaload:"reload",reloaded:"reload",gunnerd:"gunner"};
+
+// Constrained speech lattice: correct a *command slot* only, never a number,
+// bearing, negative, crew name, or target. This avoids hallucinated orders.
+const ACTION_LEXICON=[
+ "advance","forward","proceed","drive","move","push","reverse","back","halt","stop",
+ "turn","steer","rotate","pivot","traverse","slew","heading","face","orient","align",
+ "load","reload","chamber","select","fire","shoot","acquire","track","engage",
+ "report","status","sitrep","scan","look","hold","cease","restart","retry","spot","designate"
+];
+const ACTION_SPEECH_SYNONYMS={
+ "advanced":"advance","advancing":"advance","advancd":"advance","advnace":"advance",
+ "advnced":"advance","advanc":"advance","advenced":"advance","advans":"advance",
+ "foward":"forward","forword":"forward","forwards":"forward","reverce":"reverse",
+ "revers":"reverse","reversed":"reverse","reversing":"reverse",
+ "turnt":"turn","turning":"turn","trun":"turn","tern":"turn",
+ "traversed":"traverse","traversing":"traverse","travers":"traverse",
+ "fired":"fire","firing":"fire","fier":"fire","fiire":"fire",
+ "loaded":"load","loading":"load","reaload":"reload",
+ "stoped":"stop","stopped":"stop","haltt":"halt","reporting":"report"
+};
+function editDistance(a,b){
+ if(Math.abs(a.length-b.length)>2)return 3;
+ const m=Array.from({length:b.length+1},(_,i)=>i);
+ for(let i=1;i<=a.length;i++){
+  let last=m[0];m[0]=i;
+  for(let j=1;j<=b.length;j++){
+   const save=m[j];
+   m[j]=Math.min(m[j]+1,m[j-1]+1,last+(a[i-1]===b[j-1]?0:1));
+   last=save;
+  }
+ }
+ return m[b.length];
+}
+function correction(word){
+ if(ACTION_SPEECH_SYNONYMS[word])return ACTION_SPEECH_SYNONYMS[word];
+ if(ACTION_LEXICON.includes(word)||word.length<5)return word;
+ const found=ACTION_LEXICON.filter(v=>v.length>=5&&editDistance(word,v)===1);
+ return found.length===1?found[0]:word;
+}
+export function normalizeCommandSlots(text){
+ // Only words in a plausible action position after an actor or a connector
+ // are candidates for fuzzy repair. All other words remain literal.
+ const parts=text.split(/(\s+)/);
+ const actors=new Set(Object.keys(ACTORS));
+ const connectors=new Set(["and","then","while","after","meanwhile"]);
+ let open=true;
+ for(let i=0;i<parts.length;i++){
+  const word=parts[i];if(!/^[a-z]+$/.test(word))continue;
+  const previous=i>=2?parts[i-2]:"";
+  if(actors.has(previous)||connectors.has(previous)||actors.has(word)){open=true;if(actors.has(word))continue;}
+  if(open&&!["us","the","to","you","please","just"].includes(word)){
+   const fixed=correction(word);
+   parts[i]=fixed;
+   // Once a command verb starts, arguments are never autocorrected.
+   if(ACTION_LEXICON.includes(fixed))open=false;
+  }
+ }
+ return parts.join("");
+}
+
 export function normalizeSpeech(input){
   return String(input??"").toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
@@ -154,7 +214,7 @@ function ammoOf(raw){
 }
 
 export function parseTransmission(input,prior={}){
- const normalized=normalizeSpeech(input),frames=[],errors=[];
+ const normalized=normalizeCommandSlots(normalizeSpeech(input)),frames=[],errors=[];
  let focusActor=prior.focusActor||null;
  if(!normalized)return {ok:false,frames,errors:[{code:"EMPTY",detail:"No transmission"}],discourse:{focusActor},normalized};
  const sections=splitSections(normalized);
