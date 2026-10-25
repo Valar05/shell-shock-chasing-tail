@@ -60,6 +60,10 @@ try{
  }),initial.marker);
  if(!(((turned.hull-initial.hull+540)%360)-180<-2&&turned.x>initial.x+.04))
   throw Error('LEFT steering visually reversed or stalled: '+JSON.stringify({initial,turned}));
+ const hedgesBefore=await orient.evaluate(()=>window.__shellShockDebug.hedgeRotations());
+ await orient.waitForTimeout(200);
+ const hedgesAfter=await orient.evaluate(()=>window.__shellShockDebug.hedgeRotations());
+ if(JSON.stringify(hedgesBefore)!==JSON.stringify(hedgesAfter))throw Error('Hedge sprite rotates with camera');
  await orient.close();
 
  // Voice-first end-to-end with an injected browser speech recognizer: final
