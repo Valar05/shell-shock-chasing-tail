@@ -83,9 +83,13 @@ try{
   const result=[{transcript:'Driver advance and turn 20 degrees left'}];result.isFinal=true;
   window.__testRecognition.onresult({resultIndex:0,results:[result]});
  });
- const spoken=await voice.locator('#message').textContent();
- if(!/Advancing/.test(spoken)||!/Turning left 20 degrees/.test(spoken))
-  throw Error('Compound voice command was not executed atomically: '+spoken);
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),{timeout:5000});
+ const spoken=await voice.locator('#voice-state').textContent();
+ if(!/Driver advance and turn 20 degrees left/.test(spoken))
+  throw Error('Compound speech packet was not submitted together: '+spoken);
+ const gameText=await voice.locator('#message').textContent();
+ if(!/Advancing/.test(gameText)||!/Turning left 20 degrees/.test(gameText))
+  throw Error('Compound voice commands did not execute: '+gameText);
  if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
   throw Error('Microphone is not an active toggle');
  await voice.close();
