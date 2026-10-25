@@ -53,7 +53,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},threatMemory:null,breaches:[],crushedTrees:[],navigation:null,pendingFrames:[],orderJobs:[],orderPacketId:0,
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},threatMemory:null,breaches:[],crushedTrees:[],navigation:null,treeChoice:null,pendingFrames:[],orderJobs:[],orderPacketId:0,
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,moveRemaining:null,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -177,17 +177,21 @@ function executeFrame(g,job){
   }else response="Silver: No confirmed target at bearing "+Math.round(indicated)+" degrees.";
   job.status="done";
  }else if(f.action==="CRUSH_TREE"){
-  const eligible=trees.filter(t=>!g.crushedTrees.includes(t.id)&&distance(p,t)>9&&distance(p,t)<150)
-   .map(t=>({...t,angle:Math.abs(diff(bearing(p,t),g.view)),range:distance(p,t)}))
-   .filter(t=>t.angle<22).sort((a,b)=>a.angle-b.angle||a.range-b.range);
-  if(!eligible.length){response="Delta: I can't identify a tree in your sightline. Look toward one and repeat the order.";job.status="done";}
-  else if(eligible.length>1&&eligible[1].angle-eligible[0].angle<4&&Math.abs(eligible[1].range-eligible[0].range)<20){
-   response="Delta: Multiple trees on that bearing. Which one, sir?";job.status="done";
-  }else{
-   const tree=eligible[0];job.treeId=tree.id;g.navigation={action:"CRUSH_TREE",treeId:tree.id,x:tree.x,z:tree.z};
+ const all=trees.filter(t=>!g.crushedTrees.includes(t.id)&&distance(p,t)>4&&distance(p,t)<150)
+  .map(t=>({...t,angle:Math.abs(diff(bearing(p,t),g.view)),range:distance(p,t)}));
+ const nearest=all.filter(t=>t.range<=18).sort((a,b)=>a.range-b.range)[0];
+ const sighted=all.filter(t=>t.angle<=13).sort((a,b)=>a.angle-b.angle||a.range-b.range)[0];
+ if(nearest&&sighted&&nearest.id!==sighted.id){
+  g.treeChoice={nearestId:nearest.id,sightedId:sighted.id};
+  response="Delta: A tree near the tank and another in your sights. Nearest tree or the one you're looking at?";
+  job.status="done";
+ }else{
+  const t=nearest||sighted;
+  if(!t){response="Delta: No identifiable tree nearby or in your sights.";job.status="done";}
+  else{g.treeChoice=null;job.treeId=t.id;g.navigation={action:"CRUSH_TREE",treeId:t.id,x:t.x,z:t.z};
    p.moving=0;p.turn=0;p.turnRemaining=0;p.moveRemaining=null;
-   response="Delta: Tree identified. Steering to run it down.";
-  }
+   response="Delta: Tree identified at "+Math.round(t.range)+" meters. Moving to crush it.";}
+ }
  }else if(f.action==="RESTART"){
   response="Restart available by voice or Play again.";
   job.status="done";
@@ -235,6 +239,26 @@ function processOrderGraph(g){
  if(g.orderJobs?.length>160)g.orderJobs=g.orderJobs.filter(j=>j.status==="pending"||j.status==="running").slice(-160);
 }
 export function command(g,input){
+ if(g.treeChoice){
+  const said=String(input||'').toLowerCase().trim();
+  const nearest=/\b(?:nearest|closest|nearby)\b/.test(said);
+  const sighted=/\b(?:looking at|sights|crosshair|cursor|farther|distant)\b/.test(said);
+  if(nearest!==sighted){
+   const id=nearest?g.treeChoice.nearestId:g.treeChoice.sightedId;
+   const t=trees.find(t=>t.id===id&&!g.crushedTrees.includes(t.id));
+   g.treeChoice=null;
+   if(t){
+    g.navigation={action:"CRUSH_TREE",treeId:t.id,x:t.x,z:t.z};
+    g.player.moving=0;g.player.turn=0;g.player.turnRemaining=0;g.player.moveRemaining=null;
+    return "Delta: Understood. Steering for the "+(nearest?"nearest":"sighted")+" tree.";
+   }
+   return "Delta: That tree is unavailable. Designate another.";
+  }
+  if(/\b(?:cancel|never mind|disregard)\b/.test(said)){g.treeChoice=null;return "Delta: Tree order cancelled.";}
+  if(/\b(?:tree|which one|that one)\b/.test(said))
+   return "Delta: Nearest tree or the one you're looking at?";
+  g.treeChoice=null;
+ }
  const parsed=parseTransmission(input,g.discourse||{});
  if(!parsed.ok)return "Silver: Order not executed. "+parsed.errors.map(e=>e.code+": "+(e.clause||e.detail)).join("; ")+".";
  if(parsed.frames.some(f=>f.action==="RESTART")){
