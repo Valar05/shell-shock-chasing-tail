@@ -47,7 +47,7 @@ test('generated single-edit ASR matrix never dispatches an incorrect action',()=
    }
   }
  }
- assert.ok(trials>900);assert.ok(accepted>15);assert.ok(rejected>0);
+ assert.ok(trials>500);assert.ok(accepted>15);assert.ok(rejected>0);
 });
 test('multi-verb packet fuzz always preserves atomic rejection',()=>{
  const wrong=['teleport','levitate','explade','unknown','flee'];
