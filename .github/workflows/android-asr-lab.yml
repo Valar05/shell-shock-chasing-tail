@@ -1,0 +1,36 @@
+name: Android ASR Lab (research)
+on:
+  pull_request:
+    paths:
+      - 'research/android-asr/**'
+      - '.github/workflows/android-asr-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install SDK 35
+        run: |
+          echo "SDK path: $ANDROID_HOME"
+          SDKMANAGER="$(find "$ANDROID_HOME/cmdline-tools" -name sdkmanager -type f | head -n 1)"
+          test -n "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.10.2'
+      - name: Build standalone Android native recognizer APK
+        working-directory: research/android-asr
+        run: gradle :app:assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-shock-native-asr-lab-debug-apk
+          path: research/android-asr/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
