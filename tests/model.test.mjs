@@ -16,3 +16,29 @@ test('hedges slow but never immobilize advancing tank; house remains solid',()=>
 test('left turn decreases compass bearing while right turn increases it',()=>{const g=makeGame();const initial=g.player.hull;command(g,'driver left 10 degrees');for(let i=0;i<30;i++)step(g,.05);assert.ok(diff(g.player.hull,initial)<0);command(g,'driver right 10 degrees');for(let i=0;i<30;i++)step(g,.05);assert.ok(Math.abs(diff(g.player.hull,initial))<1e-8);});
 
 test('bulldozed building creates persistent sight corridor',()=>{const g=makeGame();g.player.x=87;g.player.z=128;g.player.hull=0;g.player.moving=11;for(let i=0;i<120;i++)step(g,.05);assert.equal(g.breaches.length,1);const b=g.breaches[0];assert.equal(b.axis,'z');assert.equal(b.width,14);assert.equal(g.breaches[0].id,3);});
+
+test('Delta spots line-of-sight armor within driving arc and reports once',()=>{
+ const g=makeGame();g.player.x=0;g.player.z=0;g.player.hull=0;g.player.turret=180;g.enemy.x=0;g.enemy.z=75;
+ step(g,.05);
+ assert.equal(g.contactReported.delta,true);
+ assert.equal(g.contactReported.beta,false);
+ assert.equal(g.crewEvents.length,1);
+ assert.match(g.crewEvents[0].message,/Delta: Armor ahead/);
+ assert.match(g.crewEvents[0].message,/Bearing 0 degrees/);
+ for(let i=0;i<10;i++)step(g,.05);
+ assert.equal(g.crewEvents.filter(x=>x.speaker==='delta').length,1);
+});
+test('Beta detects separately through his gun sight, even outside driver cone',()=>{
+ const g=makeGame();g.player.x=0;g.player.z=0;g.player.hull=0;g.player.turret=90;g.enemy.x=75;g.enemy.z=0;
+ step(g,.05);
+ assert.equal(g.contactReported.delta,false);
+ assert.equal(g.contactReported.beta,true);
+ assert.match(g.crewEvents[0].message,/Beta: Panzer in my sights/);
+});
+test('occluded or rearward targets cannot produce supernatural callouts',()=>{
+ const g=makeGame();g.player.x=0;g.player.z=0;g.player.hull=0;g.player.turret=0;
+ g.enemy.x=0;g.enemy.z=-75;step(g,.05);
+ assert.equal(g.crewEvents.length,0);
+ const h=makeGame();h.player.x=-28;h.player.z=40;h.player.hull=0;h.player.turret=0;h.enemy.x=-28;h.enemy.z=95;
+ step(h,.05);assert.equal(h.crewEvents.length,0);
+});
