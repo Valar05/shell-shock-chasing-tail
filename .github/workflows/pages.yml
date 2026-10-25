@@ -34,7 +34,9 @@ jobs:
       - id: deployment
         uses: actions/deploy-pages@v4
       - name: Verify actual Pages browser voice with real human recording
-        run: SHELL_SHOCK_TEST_URL="${{ steps.deployment.outputs.page_url }}?v=${{ github.sha }}" node tests/voice-real-smoke.mjs
+        run: SHELL_SHOCK_TEST_URL="${{ steps.deployment.outputs.page_url }}?voice=moonshine&v=${{ github.sha }}" node tests/voice-real-smoke.mjs
+      - name: Verify hosted default Whisper with actual WAV through microphone track
+        run: SHELL_SHOCK_WHISPER_SITE="${{ steps.deployment.outputs.page_url }}?v=${{ github.sha }}" node tests/whisper-integrated-mic.mjs
       - name: Verify pinned field candidate and write receipt
         env:
           SHELL_SHOCK_SITE: "${{ steps.deployment.outputs.page_url }}?v=${{ github.sha }}"
