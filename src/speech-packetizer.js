@@ -10,10 +10,10 @@ export function createSpeechPacketizer({submit,status=()=>{},setDelay=setTimeout
  let interim="";
  let lastRecognized="",batchNumber=0,consumedThrough=-1,baseIndex=0;
  const clear=()=>{if(timer!==null)clearDelay(timer);timer=null;};
- const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\\s+/g,' ').trim();
+ const norm=s=>String(s).toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
  const merge=(a,b)=>{if(!a)return b;if(!b)return a;const x=norm(a),y=norm(b);if(x===y||x.endsWith(' '+y)||x===y)return a;
   if(y.startsWith(x+' '))return b;
-  const aa=a.split(/\\s+/),bb=b.split(/\\s+/);let count=0;
+  const aa=a.split(/\s+/),bb=b.split(/\s+/);let count=0;
   for(let n=Math.min(aa.length,bb.length);n>0;n--){if(norm(aa.slice(-n).join(' '))===norm(bb.slice(0,n).join(' '))){count=n;break;}}
   return [a,...bb.slice(count)].join(' ');};
  const combined=()=>[...finalized.entries()].sort((a,b)=>a[0]-b[0]).map(([,s])=>s).concat(interim?[interim]:[]).reduce(merge,'').trim();
@@ -50,10 +50,6 @@ export function createSpeechPacketizer({submit,status=()=>{},setDelay=setTimeout
     if(result.isFinal){if(speech)finalized.set(i,speech);interim="";consumedThrough=Math.max(consumedThrough,i);}
     else interim=speech;
    }
-   if(consumedThrough>=baseIndex&&event.results.length>0)baseIndex=Math.max(baseIndex,Math.min(consumedThrough+1,event.results.length));
-   // Do not advance past the current pending final slots. The base index only
-   // moves after dispatch, otherwise multi-result packets lose their first half.
-   if(finalized.size)baseIndex=Math.min(baseIndex,...finalized.keys());
    schedule();
   },
   flush:dispatch,
