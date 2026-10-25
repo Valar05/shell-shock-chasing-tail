@@ -33,6 +33,7 @@ jobs:
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y espeak-ng
+          set -o pipefail
           VOICE_TRIALS=5 node tests/voice-reliability.mjs | tee /tmp/voice-reliability.log
       - uses: actions/upload-artifact@v4
         if: always()
