@@ -2,6 +2,7 @@
 // MediaStreamTrack provided by our Web Audio capture pipeline.
 // Low-level Transcriber/Stream API ensures no second unfiltered mic opens.
 import {Transcriber,ModelArch} from '@moonshine-ai/moonshine-wasm';
+import wasmAssetUrl from '@moonshine-ai/moonshine-wasm/moonshine.wasm?url';
 
 export function createMoonshineRecognizer({input,onPartial=()=>{},onFinal=()=>{},onStatus=()=>{},createContext=()=>new (globalThis.AudioContext||globalThis.webkitAudioContext)(),load=options=>Transcriber.load(options)}){
  let transcriber=null,stream=null,context=null,source=null,processor=null,silent=null;
@@ -12,7 +13,7 @@ export function createMoonshineRecognizer({input,onPartial=()=>{},onFinal=()=>{}
   starting=true;const token=++epoch;
   try{
    onStatus('Loading browser speech model…');
-   transcriber=await load({language:'en',modelArch:ModelArch.MediumStreaming});
+   transcriber=await load({language:'en',modelArch:ModelArch.MediumStreaming,moduleOptions:{locateFile:path=>path.endsWith('.wasm')?wasmAssetUrl:path}});
    if(token!==epoch)return;
    const capture=await input.prepare();
    if(token!==epoch)return;
