@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createSpeechPacketizer} from './speech-packetizer.js';
 import {parseTransmission} from './command-parser.js';
 import {createFilteredSpeechInput} from './filtered-speech-input.js';
-import {createBrowserWasmRecognizer} from './wasm-speech-recognizer.js';
+import {createMoonshineRecognizer} from './moonshine-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,trees,bearing,norm,diff} from './model.js';
@@ -106,7 +106,7 @@ function commanderBargeIn(t){
  return parseTransmission(t).ok;
 }
 let partial='';
-const wasmVoice=createBrowserWasmRecognizer({
+const wasmVoice=createMoonshineRecognizer({
  input:filteredInput,
  onPartial:text=>{
   partial=text;
@@ -133,7 +133,7 @@ mic.addEventListener('click',async()=>{
  }
  wantListening=true;updateVoice('Loading browser speech recognition…');
  try{await wasmVoice.start();if(!wantListening)await wasmVoice.stop();}
- catch(error){wantListening=false;await wasmVoice.stop();updateVoice('WASM voice failed: '+(error?.message||error));}
+ catch(error){wantListening=false;await wasmVoice.stop();updateVoice('Browser speech failed: '+(error?.message||error));}
 });
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
