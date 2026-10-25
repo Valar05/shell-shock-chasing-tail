@@ -106,7 +106,6 @@ export function normalizeSpeech(input){
     .replace(/\b(?:uh+|um+|please|kindly)\b/g," ")
     .replace(/\b(?:go ahead and|would you|could you|can you)\b/g," ")
     .replace(/\b(\w+)(?:\s+\1\b)+/g,"$1")
-    .replace(/\b[a-z]+\b/g,word=>ASR_ACTION_CORRECTIONS[word]||word)
     .replace(/\s+/g," ").trim();
 }
 function numeric(s){
