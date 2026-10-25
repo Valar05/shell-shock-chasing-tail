@@ -4,9 +4,14 @@
 import {chromium} from 'playwright';
 import {spawn,execFileSync} from 'node:child_process';
 import {readFileSync,mkdirSync} from 'node:fs';
-const wav='/tmp/shell-shock-real-order.wav';
-execFileSync('espeak',['-v','en-us','-s','125','-w',wav,'driver advance']);
-const sample=readFileSync(wav).toString('base64');
+// Google mini Speech Commands includes real recorded human voices, unlike
+// robotic eSpeak playback (which the model consistently misheard).
+const zip='/tmp/shell-shock-mini-speech.zip';
+execFileSync('curl',['-fsSL','--retry','2','-o',zip,'https://storage.googleapis.com/download.tensorflow.org/data/mini_speech_commands.zip']);
+const entries=execFileSync('unzip',['-Z1',zip]).toString().split('\n');
+const clipPath=entries.find(x=>/(?:^|\/)stop\/[^/]+\.wav$/.test(x));
+if(!clipPath)throw Error('Human speech STOP sample missing in mini dataset');
+const sample=execFileSync('unzip',['-p',zip,clipPath],{maxBuffer:200000}).toString('base64');
 const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
 try{
@@ -45,8 +50,8 @@ try{
  await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:90000});
  const text=await page.locator('#voice-state').textContent();
  const game=await page.locator('#message').textContent();
- if(!/Advancing/i.test(game))throw Error('Actual WAV recognition did not execute advance: '+JSON.stringify({text,game}));
+ if(!/Halted/i.test(game))throw Error('Human STOP WAV was not recognized and executed: '+JSON.stringify({text,game,clipPath}));
  if(errors.length)throw Error('Page errors: '+errors.join('\\n'));
- console.log(JSON.stringify({result:'REAL_WASM_TRANSCRIPTION_PASS',text,game,latencyMs:Date.now()-started,
+ console.log(JSON.stringify({result:'REAL_HUMAN_WAV_TRANSCRIPTION_PASS',text,game,latencyMs:Date.now()-started,
   captureRequests:await page.evaluate(()=>window.__voiceCaptureRequests)}));
 }finally{await browser?.close();server.kill();}
