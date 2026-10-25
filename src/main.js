@@ -108,7 +108,7 @@ function commanderBargeIn(t){
 let partial='';
 const wasmVoice=createMoonshineRecognizer({
  input:filteredInput,
- load:new URLSearchParams(location.search).has('voice-test')?options=>window.__voiceTestLoad(options):undefined,
+ load:import.meta.env.DEV&&new URLSearchParams(location.search).has('voice-test')?options=>window.__voiceTestLoad(options):undefined,
  onPartial:text=>{
   partial=text;
   if(!text)return;
