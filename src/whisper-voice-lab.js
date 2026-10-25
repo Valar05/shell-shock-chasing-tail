@@ -23,7 +23,7 @@ async function transcribeAudio(pcm){
  if(!(pcm instanceof Float32Array)||!pcm.length)throw Error('Nonempty real PCM required');
  const model=await load();
  const started=performance.now();
- const response=await model(pcm,{language:'english',task:'transcribe'});
+ const response=await model(pcm);
  const result={transcript:response.text,elapsedMs:Math.round(performance.now()-started),samples:pcm.length};
  say(JSON.stringify(result,null,2));return result;
 }
