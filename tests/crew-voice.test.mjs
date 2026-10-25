@@ -32,3 +32,33 @@ test('browser synth adapter can be replaced with recorded clips',()=>{
  assert.equal(spoken[1].text,'Incoming! We took a hit!');
  engine.enable(false);assert.ok(cancels>0);
 });
+
+test('commander interruption cancels active subordinate and resumes remaining words after reply',()=>{
+ const utterances=[],cancelled=[];
+ class U{constructor(text){this.text=text;}}
+ const synth={speaking:false,pending:false,getVoices:()=>[{lang:'en-US'}],addEventListener(){},
+  speak(u){utterances.push(u);this.speaking=true;},cancel(){cancelled.push(true);this.speaking=false;}};
+ const voice=createCrewVoice({synthesis:synth,Utterance:U});voice.enable(true);
+ voice.say({id:'silver.long',speaker:'silver',priority:1,text:'Enemy tank moving behind the farmhouse at two o clock.'});
+ const first=utterances[0];first.onboundary({charIndex:18});
+ assert.equal(voice.interrupt(),true);
+ assert.equal(voice.interrupted,true);
+ assert.ok(cancelled.length);
+ voice.say({id:'delta.new',speaker:'delta',priority:1,text:'Turning left, sir.'});
+ assert.equal(utterances.length,1,'crew waits while commander speaks');
+ voice.resume();
+ assert.equal(utterances[1].text,'Turning left, sir.');
+ utterances[1].onend();
+ assert.ok(utterances[2].text.includes('behind the farmhouse'));
+ assert.equal(voice.interrupted,false);
+});
+test('cancelled synthesis callbacks cannot complete replacement audio',()=>{
+ const utterances=[];
+ class U{constructor(text){this.text=text;}}
+ const synth={speaking:false,pending:false,getVoices:()=>[],addEventListener(){},speak(u){utterances.push(u)},cancel(){}};
+ const voice=createCrewVoice({synthesis:synth,Utterance:U});voice.enable(true);
+ voice.say({id:'old',speaker:'silver',text:'Old warning',priority:1});
+ const old=utterances[0];voice.interrupt();voice.say({id:'new',speaker:'delta',text:'New command',priority:1});voice.resume();
+ const count=utterances.length;old.onend();
+ assert.equal(utterances.length,count);
+});
