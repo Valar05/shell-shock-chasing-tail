@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createSpeechPacketizer} from './speech-packetizer.js';
+import {parseTransmission} from './command-parser.js';
 import {createFilteredSpeechInput} from './filtered-speech-input.js';
 import {createBrowserWasmRecognizer} from './wasm-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
@@ -62,6 +63,8 @@ function isCrewEcho(transcript){
  const heardTokens=heard.split(' ');
  return candidates.some(spoken=>{
    if(heard===spoken)return true;
+   const sw=spoken.split(' '),overlap=heardTokens.filter(w=>sw.includes(w)).length;
+   if(heardTokens.length>=3&&overlap/heardTokens.length>=.75)return true;
    if(heardTokens.length>=2&&spoken.includes(heard))return true;
    // Recognizers sometimes append text around a complete spoken line.
    if(spoken.split(' ').length>=3&&heard.includes(spoken))return true;
@@ -94,6 +97,14 @@ let wantListening=false;
 const filteredInput=createFilteredSpeechInput();
 function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
 const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.resume();},status:msg=>voiceState.textContent=msg});
+// Fail closed while synthesized speech plays: ASR is not a speaker-identity
+// detector. Only independent, valid imperative commander orders can barge in.
+function commanderBargeIn(t){
+ const spoken=words(t);
+ if(isCrewEcho(t))return false;
+ if(!/^(?:driver|delta|gunner|beta|loader|gamma|silver|fire|halt|stop|advance|reverse|turn|load)\\b/.test(spoken))return false;
+ return parseTransmission(t).ok;
+}
 let partial='';
 const wasmVoice=createBrowserWasmRecognizer({
  input:filteredInput,
@@ -107,6 +118,7 @@ const wasmVoice=createBrowserWasmRecognizer({
  },
  onFinal:text=>{
   if(isCrewEcho(text)){voiceState.textContent='Ignoring crew speaker audio';return;}
+  if(crewSpeaking&&!commanderBargeIn(text)){voiceState.textContent='Crew audio excluded from commands';return;}
   if(crewSpeaking)crewVoice.interrupt();
   // Vosk results are already complete utterances, not WebSpeech slot arrays.
   issue(text);crewVoice.resume();voiceState.textContent='Command sent: '+text;
