@@ -13,7 +13,7 @@ export function createMoonshineRecognizer({input,onPartial=()=>{},onFinal=()=>{}
   starting=true;const token=++epoch;
   try{
    onStatus('Loading browser speech model…');
-   transcriber=await load({language:'en',modelArch:ModelArch.SmallStreaming,onProgress:(loaded,total,file)=>onStatus('Downloading speech model: '+file+' '+Math.round(loaded/1024/1024)+' MB'+(total?' / '+Math.round(total/1024/1024)+' MB':'')),moduleOptions:{locateFile:path=>path.endsWith('.wasm')?wasmAssetUrl:path}});
+   transcriber=await load({language:'en',modelArch:ModelArch.MediumStreaming,onProgress:(loaded,total,file)=>onStatus('Downloading speech model: '+file+' '+Math.round(loaded/1024/1024)+' MB'+(total?' / '+Math.round(total/1024/1024)+' MB':'')),moduleOptions:{locateFile:path=>path.endsWith('.wasm')?wasmAssetUrl:path}});
    if(token!==epoch)return;
    // Mild domain vocabulary boost, not a forced phrase grammar. Normal speech
    // remains possible, unlike the rejected Vosk command-list experiment.
