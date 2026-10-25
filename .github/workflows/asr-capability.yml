@@ -1,0 +1,20 @@
+name: Speech recognizer automated capability comparison
+on:
+  pull_request:
+    paths:
+      - 'tests/native-track-probe.mjs'
+      - '.github/workflows/asr-capability.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  native-browser-probe:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm ci --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: sudo apt-get update -qq && sudo apt-get install -y espeak-ng
+      - name: Probe true browser-native recognition of injected WAV
+        run: node tests/native-track-probe.mjs
