@@ -96,7 +96,21 @@ function retryListening(){if(!wantListening||listening)return;clearTimeout(resta
 if(SpeechRecognition){
  recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
  recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
- recognition.onresult=ev=>{const text=Array.from(ev.results).slice(ev.resultIndex||0).map(r=>r[0]?.transcript||'').join(' ').trim();if(isCrewEcho(text)){speechPackets.abort();voiceState.textContent='Ignoring crew speaker audio';return;}if(text&&crewSpeaking)crewVoice.interrupt();speechPackets.receive(ev);};
+ recognition.onresult=ev=>{
+ const changed=Array.from(ev.results).slice(ev.resultIndex||0);
+ const text=changed.map(r=>r[0]?.transcript||'').join(' ').trim();
+ if(!text)return;
+ if(isCrewEcho(text)){voiceState.textContent='Ignoring crew speaker audio';return;}
+ // Music or fragments of synthesized dialogue must not interrupt the radio.
+ // A barge-in requires a final recognized order, or a clearly addressed
+ // interim instruction. The recognizer continues listening throughout.
+ const hasFinal=changed.some(r=>r.isFinal);
+ const addressed=/^(?:driver|delta|gunner|beta|loader|gamma|silver|alpha|commander)\b/i.test(text);
+ if(crewSpeaking&&!hasFinal&&!addressed)return;
+ if(crewSpeaking&&!addressed&&!/^(?:fire|halt|stop|reverse|advance|turn|reload)\b/i.test(text))return;
+ if(crewSpeaking)crewVoice.interrupt();
+ speechPackets.receive(ev);
+};
  recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
  recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
  mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
