@@ -1,0 +1,34 @@
+name: Sherpa-ONNX actual audio benchmark
+on:
+  pull_request:
+    paths:
+      - 'research/sherpa-benchmark/**'
+      - '.github/workflows/sherpa-benchmark.yml'
+  workflow_dispatch:
+permissions: {contents: read}
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: {python-version: '3.11'}
+      - name: Install recognition runtime and synthesized-speech generator
+        run: |
+          python -m pip install --disable-pip-version-check numpy sherpa-onnx
+          sudo apt-get update -qq
+          sudo apt-get install -y espeak-ng
+      - name: Fetch real streaming English INT8 model (20M parameters)
+        run: |
+          curl -fL --retry 3 -o /tmp/sherpa-model.tar.bz2 https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-streaming-zipformer-en-20M-2023-02-17.tar.bz2
+          tar xf /tmp/sherpa-model.tar.bz2
+          ls -lh sherpa-onnx-streaming-zipformer-en-20M-2023-02-17/*onnx
+      - name: Decode five phrases five times each
+        run: python research/sherpa-benchmark/benchmark.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sherpa-real-wav-results
+          path: artifacts/sherpa-results.json
+          if-no-files-found: warn
