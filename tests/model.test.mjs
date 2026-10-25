@@ -42,3 +42,34 @@ test('occluded or rearward targets cannot produce supernatural callouts',()=>{
  const h=makeGame();h.player.x=-28;h.player.z=40;h.player.hull=0;h.player.turret=0;h.enemy.x=-28;h.enemy.z=95;
  step(h,.05);assert.equal(h.crewEvents.length,0);
 });
+
+test('gunner remembers a sighted tank disappearing behind farmhouse and searches',()=>{
+ const g=makeGame();g.player.x=87;g.player.z=110;g.player.hull=0;g.player.turret=0;
+ g.enemy.x=87;g.enemy.z=125;
+ step(g,.05);
+ assert.equal(g.threatMemory.observers.beta.state,'visible');
+ assert.equal(g.threatMemory.z,125);
+ g.enemy.z=190;
+ step(g,.05);
+ assert.equal(g.threatMemory.observers.beta.state,'lost');
+ assert.equal(g.threatMemory.z,125,'memory must not update to hidden target position');
+ assert.equal(g.threatMemory.state,'last-known');
+ const lost=g.crewEvents.find(e=>e.id==='beta.lost');
+ assert.match(lost.message,/behind the farmhouse/i);
+ assert.equal(g.player.aim,null);
+ const heading=g.player.turret;
+ for(let i=0;i<45;i++)step(g,.05);
+ assert.notEqual(g.player.turret,heading,'gunner should scan near last known location');
+ assert.equal(g.crewEvents.filter(e=>e.id==='beta.lost').length,1,'no repeated lost reports');
+ g.enemy.z=125;
+ step(g,.05);
+ assert.equal(g.threatMemory.observers.beta.state,'visible');
+ assert.equal(g.crewEvents.filter(e=>e.id==='beta.reacquired').length,1);
+});
+test('no threat memory or false report for unseen armor behind farmhouse',()=>{
+ const g=makeGame();g.player.x=87;g.player.z=110;g.player.hull=0;g.player.turret=0;
+ g.enemy.x=87;g.enemy.z=190;
+ step(g,.05);
+ assert.equal(g.threatMemory,null);
+ assert.equal(g.crewEvents.length,0);
+});
