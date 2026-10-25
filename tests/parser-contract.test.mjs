@@ -124,3 +124,16 @@ test('large compound command remains deterministic across 100 compilations',()=>
  const baseline=JSON.stringify(graph(utterance));
  for(let i=0;i<100;i++)assert.equal(JSON.stringify(graph(utterance)),baseline);
 });
+
+test('ASR autocorrect variants preserve compound two-order execution',()=>{
+ for(const phrase of ['Driver advanced and turn twenty degrees left','Driver advancd and trun 20 degrees left','Driver advnace and turn left 20 degrees']){
+  const p=graph(phrase);assert.equal(p.ok,true,JSON.stringify(p));assert.deepEqual(p.frames.map(f=>f.action),['ADVANCE','TURN']);
+  const g=makeGame();command(g,phrase);assert.ok(g.player.moving>0,phrase);assert.ok(g.player.turn<0,phrase);
+ }
+});
+test('independent two-crew orders in one transmission',()=>{
+ const p=graph('Driver advanced and Gamma load AP');
+ assert.equal(p.ok,true,JSON.stringify(p));assert.deepEqual(p.frames.map(f=>f.action),['ADVANCE','LOAD']);
+ const g=makeGame();const response=command(g,'Driver advanced and Gamma load AP');
+ assert.ok(g.player.moving>0);assert.ok(g.loading>0);assert.match(response,/Advancing/);assert.match(response,/loading/i);
+});
