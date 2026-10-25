@@ -39,10 +39,35 @@ renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs
 const ui=document.querySelector('#message');
 let lastSpokenMessage='';
 let crewSpeaking=false;
+// Web Speech does not expose the captured audio stream or a reference signal
+// for guaranteed AEC. This secondary guard rejects likely speaker-loop
+// transcripts, including delayed results after speechSynthesis has ended.
+const recentCrewAudio=[];
 function words(t){return String(t||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
-function isCrewEcho(transcript){const heard=words(transcript),spoken=words(crewVoice.speakingText);if(!heard||!spoken)return false;if(/^(?:driver|delta|gunner|beta|loader|gamma|silver|commander|alpha)\b/.test(heard))return false;return heard.length>=5&&(spoken.includes(heard)||heard.includes(spoken));}
+function rememberCrewAudio(t){
+ const normalized=words(t);if(!normalized)return;
+ recentCrewAudio.push({text:normalized,at:Date.now()});
+ while(recentCrewAudio.length>12)recentCrewAudio.shift();
+}
+function isCrewEcho(transcript){
+ const heard=words(transcript);if(heard.length<5)return false;
+ const now=Date.now();
+ while(recentCrewAudio.length&&now-recentCrewAudio[0].at>4000)recentCrewAudio.shift();
+ const active=words(crewVoice.speakingText);
+ const candidates=[active,...recentCrewAudio.map(x=>x.text)].filter(Boolean);
+ // Never whitelist a phrase merely because it starts with "Driver" or "Gunner":
+ // crew dialogue and synthetic radio chatter can contain those exact words.
+ const heardTokens=heard.split(' ');
+ return candidates.some(spoken=>{
+   if(heard===spoken)return true;
+   if(heardTokens.length>=2&&spoken.includes(heard))return true;
+   // Recognizers sometimes append text around a complete spoken line.
+   if(spoken.split(' ').length>=3&&heard.includes(spoken))return true;
+   return false;
+ });
+}
 const crewAudioButton=document.querySelector('#crew-audio');
-const crewVoice=createCrewVoice({onState:status=>{crewSpeaking=status==='speaking';},resolveInterrupted:line=>{
+const crewVoice=createCrewVoice({onState:status=>{if(status==='speaking')rememberCrewAudio(crewVoice.speakingText);crewSpeaking=status==='speaking';},resolveInterrupted:line=>{
  if(!/^(beta|delta|silver)\.(contact|lost|reacquired)$/.test(line.id))return line;
  if(g.enemy.hp<=0)return null;
  const station=line.speaker;
@@ -71,7 +96,7 @@ function retryListening(){if(!wantListening||listening)return;clearTimeout(resta
 if(SpeechRecognition){
  recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
  recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
- recognition.onresult=ev=>{const text=Array.from(ev.results).slice(ev.resultIndex||0).map(r=>r[0]?.transcript||'').join(' ').trim();if(crewSpeaking&&isCrewEcho(text))return;if(text&&crewSpeaking)crewVoice.interrupt();speechPackets.receive(ev);};
+ recognition.onresult=ev=>{const text=Array.from(ev.results).slice(ev.resultIndex||0).map(r=>r[0]?.transcript||'').join(' ').trim();if(isCrewEcho(text)){speechPackets.abort();voiceState.textContent='Ignoring crew speaker audio';return;}if(text&&crewSpeaking)crewVoice.interrupt();speechPackets.receive(ev);};
  recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
  recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
  mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
