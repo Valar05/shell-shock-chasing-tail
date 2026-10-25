@@ -33,3 +33,5 @@ jobs:
           path: dist
       - id: deployment
         uses: actions/deploy-pages@v4
+      - name: Verify actual Pages browser voice with real human recording
+        run: SHELL_SHOCK_TEST_URL="${{ steps.deployment.outputs.page_url }}?v=${{ github.sha }}" node tests/voice-real-smoke.mjs

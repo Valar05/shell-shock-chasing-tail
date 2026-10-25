@@ -68,33 +68,53 @@ try{
  if(JSON.stringify(hedgesBefore)!==JSON.stringify(hedgesAfter))throw Error('Hedge sprite rotates with camera');
  await orient.close();
 
- // Web-only WASM engine receives conditioned audio and produces completed packets.
+ // Moonshine's low-level Stream receives real PCM frames from Web Audio,
+ // with only the recognizer mocked. This is not an acoustic ASR accuracy test.
  const voice=await browser.newPage({viewport:{width:915,height:412}});
  await voice.addInitScript(()=>{
-  class MockRecognizer{
-   constructor(){window.__mockRecognizer=this;this.listeners={};}
-   on(event,fn){this.listeners[event]=fn;}
-   emit(event,result){this.listeners[event]?.({result});}
-   acceptWaveform(){}
-   remove(){}
-  }
-  window.Vosk={createModel:async()=>({KaldiRecognizer:MockRecognizer,terminate(){}})};
-  const realGet=MediaDevices.prototype.getUserMedia;
-  MediaDevices.prototype.getUserMedia=async function(){
-   const ctx=new AudioContext();window.__mockMicContext=ctx;
-   return ctx.createMediaStreamDestination().stream;
+  window.__voiceSamples=0;window.__voiceCompleted=0;
+  window.__voiceTestLoad=async()=>({
+   createStream(){
+    const stream={
+     listener:null,addListener(l){this.listener=l;},
+     start(){},stop(){},close(){},
+     addAudio(data,rate){
+      if(data instanceof Float32Array&&rate>0&&data.length)window.__voiceSamples+=data.length;
+     },transcribe(){}
+    };
+    window.__voiceTestStream=stream;return stream;
+   },close(){}
+  });
+  MediaDevices.prototype.getUserMedia=async()=>{
+   const ctx=new AudioContext();const dest=ctx.createMediaStreamDestination();
+   const oscillator=ctx.createOscillator();oscillator.frequency.value=440;
+   oscillator.connect(dest);oscillator.start();window.__voiceOsc=oscillator;
+   return dest.stream;
   };
  });
- await voice.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
+ await voice.goto('http://127.0.0.1:4173/?voice-test=1',{waitUntil:'networkidle'});
  await voice.locator('#mic').click();
- await voice.waitForFunction(()=>Boolean(window.__mockRecognizer),{timeout:15000});
- await voice.evaluate(()=>window.__mockRecognizer.emit('result',{text:'driver advance'}));
+ await voice.waitForFunction(()=>window.__voiceSamples>4096,{timeout:15000});
+ await voice.evaluate(()=>{
+  const l=window.__voiceTestStream.listener;
+  l.onLineCompleted({line:{id:'a',text:'advance'}});
+  l.onLineCompleted({line:{id:'a',text:'advance'}}); // dedupe
+ });
  await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),{timeout:5000});
  const msg=await voice.locator('#message').textContent();
- if(!/Advancing/i.test(msg))throw Error('WASM recognizer order not executed: '+msg);
- await voice.evaluate(()=>window.__mockRecognizer.emit('result',{text:'driver halt'}));
- await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('driver halt'),{timeout:5000});
- if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')throw Error('WASM mic toggle unexpectedly disabled');
+ if(!/Advancing/i.test(msg))throw Error('Moonshine PCM path did not execute command: '+msg);
+ await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'b',text:'halt'}}));
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('halt'),{timeout:5000});
+ // Replay a crew line as an ASR final: it must never become a command.
+ await voice.locator('#crew-audio').click();
+ await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'crew-echo',text:'Silver radio check crew audio online'}}));
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Ignoring crew speaker audio'),null,{timeout:5000});
+ // Distinct valid commander orders must remain available without a prefix.
+ await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'commander',text:'advance'}}));
+ await voice.waitForTimeout(150);
+ const barge=await voice.evaluate(()=>({status:document.querySelector('#voice-state')?.textContent,game:document.querySelector('#message')?.textContent}));
+ if(!/Command sent: advance/.test(barge.status))throw Error('Valid unaddressed barge-in was rejected: '+JSON.stringify(barge));
+ if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')throw Error('Mic toggle unexpectedly disabled');
  await voice.locator('#mic').click();
  await voice.close();
 

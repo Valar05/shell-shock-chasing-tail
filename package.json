@@ -10,7 +10,8 @@
     "test": "node --test tests/*.test.mjs"
   },
   "dependencies": {
-    "three": "^0.180.0"
+    "three": "^0.180.0",
+    "@moonshine-ai/moonshine-wasm": "0.1.5"
   },
   "devDependencies": {
     "vite": "^7.1.0",

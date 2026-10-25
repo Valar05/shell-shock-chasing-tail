@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import {createSpeechPacketizer} from './speech-packetizer.js';
 import {parseTransmission} from './command-parser.js';
 import {createFilteredSpeechInput} from './filtered-speech-input.js';
-import {createBrowserWasmRecognizer} from './wasm-speech-recognizer.js';
+import {createMoonshineRecognizer} from './moonshine-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,trees,bearing,norm,diff} from './model.js';
@@ -102,12 +102,13 @@ const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.
 function commanderBargeIn(t){
  const spoken=words(t);
  if(isCrewEcho(t))return false;
- if(!/^(?:driver|delta|gunner|beta|loader|gamma|silver|fire|halt|stop|advance|reverse|turn|load)\\b/.test(spoken))return false;
+ if(!/^(?:driver|delta|gunner|beta|loader|gamma|silver|fire|halt|stop|advance|reverse|turn|load)\b/.test(spoken))return false;
  return parseTransmission(t).ok;
 }
 let partial='';
-const wasmVoice=createBrowserWasmRecognizer({
+const wasmVoice=createMoonshineRecognizer({
  input:filteredInput,
+ load:import.meta.env.DEV&&new URLSearchParams(location.search).has('voice-test')?options=>window.__voiceTestLoad(options):undefined,
  onPartial:text=>{
   partial=text;
   if(!text)return;
@@ -133,7 +134,7 @@ mic.addEventListener('click',async()=>{
  }
  wantListening=true;updateVoice('Loading browser speech recognition…');
  try{await wasmVoice.start();if(!wantListening)await wasmVoice.stop();}
- catch(error){wantListening=false;await wasmVoice.stop();updateVoice('WASM voice failed: '+(error?.message||error));}
+ catch(error){wantListening=false;await wasmVoice.stop();updateVoice('Browser speech failed: '+(error?.message||error));}
 });
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
