@@ -86,7 +86,9 @@ export function normalizeCommandSlots(text){
  for(let i=0;i<parts.length;i++){
   const word=parts[i];if(!/^[a-z]+$/.test(word))continue;
   const previous=i>=2?parts[i-2]:"";
-  if(actors.has(previous)||connectors.has(previous)||actors.has(word)){open=true;if(actors.has(word))continue;}
+  if(["when","once","until","if"].includes(word)){open=false;continue;}
+  if(!open&&["reports","says","loaded","locked"].includes(word))continue;
+  if(actors.has(previous)||connectors.has(previous)||actors.has(word)){if(!parts.slice(0,i).join("").match(/\b(?:when|once|until|if)\b[^;.!?]*$/))open=true;if(actors.has(word))continue;}
   if(open&&!["us","the","to","you","please","just"].includes(word)){
    const fixed=correction(word);
    parts[i]=fixed;
