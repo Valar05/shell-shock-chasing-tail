@@ -7,10 +7,12 @@ import {readFileSync} from 'node:fs';
 const wav='/tmp/shellshock-integrated-voice.wav';
 execFileSync('espeak-ng',['-v','en-us','-s','150','-w',wav,'thirty degrees to the left and run over that tree']);
 const base64=readFileSync(wav).toString('base64');
-const server=spawn('node',['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4186'],{stdio:'ignore'});
+const remoteUrl=process.env.SHELL_SHOCK_WHISPER_SITE||'';
+const pageUrl=remoteUrl||'http://127.0.0.1:4186/';
+const server=remoteUrl?null:spawn('node',['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4186'],{stdio:'ignore'});
 let browser;
 try{
- let ready=false;for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4186/')).ok){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
+ let ready=false;for(let i=0;i<60;i++){try{if((await fetch(pageUrl)).ok){ready=true;break}}catch{}await new Promise(r=>setTimeout(r,500))}
  if(!ready)throw Error('Vite server failed');
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
  const page=await browser.newPage({viewport:{width:1000,height:700}});const errors=[];
@@ -30,7 +32,7 @@ try{
    return dest.stream;
   };
  },base64);
- await page.goto('http://127.0.0.1:4186/',{waitUntil:'domcontentloaded'});
+ await page.goto(pageUrl,{waitUntil:'domcontentloaded'});
  await page.locator('#mic').click();
  await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Whisper browser speech listening'),null,{timeout:120000});
  const duration=await page.evaluate(()=>window.__playWhisperFixture());
@@ -41,4 +43,4 @@ try{
  const result={duration,transcript,game,pageErrors:errors};
  console.log(JSON.stringify(result));
  if(!/\b(?:30|thirty)\b/.test(transcript)||!/\bleft\b/.test(transcript)||!/\btree\b/.test(transcript)||!/run over/.test(transcript)||errors.length)process.exitCode=1;
-}finally{await browser?.close();server.kill()}
+}finally{await browser?.close();server?.kill()}
