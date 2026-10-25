@@ -65,7 +65,8 @@ try{
  }
  const started=Date.now();
  await page.evaluate(()=>window.__playSpeech());
- await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:90000});
+ try{await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.startsWith('Command sent:'),null,{timeout:18000});}
+ catch(e){const state=await page.evaluate(()=>({status:document.querySelector('#voice-state')?.textContent,game:document.querySelector('#message')?.textContent}));throw Error('NO_FINAL_SPEECH '+JSON.stringify({phrase,voice,state,errors,network}));}
  const text=await page.locator('#voice-state').textContent();
  const game=await page.locator('#message').textContent();
  if(process.env.VOICE_PHRASE){
