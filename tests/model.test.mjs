@@ -73,3 +73,21 @@ test('no threat memory or false report for unseen armor behind farmhouse',()=>{
  assert.equal(g.threatMemory,null);
  assert.equal(g.crewEvents.length,0);
 });
+
+test('unaddressed movement and gun orders route to responsible crew',()=>{
+ const g=makeGame();assert.match(command(g,'advance'),/Delta: Advancing/);
+ assert.match(command(g,'load AP'),/Gamma:/);
+ assert.match(command(g,'report'),/Silver:/);
+});
+test('run over that tree resolves through commander view and actually removes world tree',async()=>{
+ const g=makeGame();g.player.x=-4;g.player.z=1;g.player.hull=8;
+ // A grounded existing tree within the forward sight line.
+ const {trees}=await import('../src/model.js');
+ const t=trees.filter(t=>Math.hypot(t.x+4,t.z-1)>9&&Math.hypot(t.x+4,t.z-1)<130)
+  .sort((a,b)=>Math.hypot(a.x+4,a.z-1)-Math.hypot(b.x+4,b.z-1))[0];
+ g.view=bearing(g.player,t);g.player.hull=g.view;
+ assert.match(command(g,'run over that tree'),/Tree identified/);
+ for(let i=0;i<1000&&!g.crushedTrees.includes(t.id);i++)step(g,.05);
+ assert.ok(g.crushedTrees.includes(t.id),'tree should be run over and removed');
+ assert.equal(g.navigation,null);
+});
