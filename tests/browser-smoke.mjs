@@ -105,6 +105,13 @@ try{
  if(!/Advancing/i.test(msg))throw Error('Moonshine PCM path did not execute command: '+msg);
  await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'b',text:'halt'}}));
  await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('halt'),{timeout:5000});
+ // Replay a crew line as an ASR final: it must never become a command.
+ await voice.locator('#crew-audio').click();
+ await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'crew-echo',text:'Silver radio check crew audio online'}}));
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Ignoring crew speaker audio'),null,{timeout:5000});
+ // Distinct valid commander orders must remain available without a prefix.
+ await voice.evaluate(()=>window.__voiceTestStream.listener.onLineCompleted({line:{id:'commander',text:'advance'}}));
+ await voice.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Command sent: advance'),null,{timeout:5000});
  if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')throw Error('Mic toggle unexpectedly disabled');
  await voice.locator('#mic').click();
  await voice.close();
