@@ -62,3 +62,19 @@ test('cancelled synthesis callbacks cannot complete replacement audio',()=>{
  const count=utterances.length;old.onend();
  assert.equal(utterances.length,count);
 });
+
+test('stale interrupted threat is dropped after target destroyed',()=>{
+ let alive=true;const utterances=[];
+ class U{constructor(text){this.text=text;}}
+ const synth={speaking:false,pending:false,getVoices:()=>[],addEventListener(){},speak(u){utterances.push(u)},cancel(){}};
+ const voice=createCrewVoice({synthesis:synth,Utterance:U,isRelevant:l=>alive||!/contact|threat|enemy|panzer/i.test(l.text)});
+ voice.enable(true);
+ voice.say({id:'beta.contact',speaker:'beta',priority:4,text:'Panzer in my sights, bearing forty.'});
+ voice.interrupt();
+ voice.say({id:'beta.destroyed',speaker:'beta',priority:5,text:'Panzer knocked out! Target destroyed!'});
+ alive=false;voice.resume();
+ assert.equal(utterances.length,2);
+ assert.match(utterances[1].text,/destroyed/);
+ utterances[1].onend();
+ assert.equal(utterances.length,2,'obsolete contact must not resume');
+});
