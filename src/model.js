@@ -4,6 +4,13 @@ export const diff = (a,b) => ((norm(a-b)+540)%360)-180;
 export const bearing=(from,to)=>norm(Math.atan2(to.x-from.x,to.z-from.z)*180/Math.PI);
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+export const trees=Array.from({length:48},(_,i)=>({id:i,x:Math.sin(i*43.17)*175,z:(i*47)%250})).filter(t=>!obstaclesPlaceholder(t));
+function obstaclesPlaceholder(t){
+ const obstacleData=[
+  {x:-28,z:64,w:50,d:9},{x:45,z:100,w:10,d:90},{x:-70,z:119,w:46,d:11},{x:87,z:147,w:29,d:24},{x:-83,z:189,w:55,d:9},{x:32,z:211,w:65,d:8}
+ ];
+ return obstacleData.some(o=>Math.abs(t.x-o.x)<o.w/2+9&&Math.abs(t.z-o.z)<o.d/2+9);
+}
 export const obstacles=[
  {x:-28,z:64,w:50,d:9,h:5,type:'hedge'},
  {x:45,z:100,w:10,d:90,h:5,type:'hedge'},
@@ -46,7 +53,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},threatMemory:null,breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},threatMemory:null,breaches:[],crushedTrees:[],navigation:null,pendingFrames:[],orderJobs:[],orderPacketId:0,
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,moveRemaining:null,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -128,7 +135,7 @@ function executeFrame(g,job){
   p.moveRemaining=f.distance;
   response="Delta: "+(p.moving>0?"Advancing":"Reversing")+(f.distance===null?".":" "+f.distance+" meters.");
  }else if(f.action==="HALT"){
-  p.moving=0;p.moveRemaining=0;p.turn=0;p.turnRemaining=0;
+  g.navigation=null;p.moving=0;p.moveRemaining=0;p.turn=0;p.turnRemaining=0;
   response="Delta: Halted, sir.";
   job.status="done";
  }else if(f.action==="TURN"){
@@ -169,6 +176,18 @@ function executeFrame(g,job){
    response="Beta: Confirmed contact, bearing "+Math.round(indicated)+" degrees.";
   }else response="Silver: No confirmed target at bearing "+Math.round(indicated)+" degrees.";
   job.status="done";
+ }else if(f.action==="CRUSH_TREE"){
+  const eligible=trees.filter(t=>!g.crushedTrees.includes(t.id)&&distance(p,t)>9&&distance(p,t)<150)
+   .map(t=>({...t,angle:Math.abs(diff(bearing(p,t),g.view)),range:distance(p,t)}))
+   .filter(t=>t.angle<22).sort((a,b)=>a.angle-b.angle||a.range-b.range);
+  if(!eligible.length){response="Delta: I can't identify a tree in your sightline. Look toward one and repeat the order.";job.status="done";}
+  else if(eligible.length>1&&eligible[1].angle-eligible[0].angle<4&&Math.abs(eligible[1].range-eligible[0].range)<20){
+   response="Delta: Multiple trees on that bearing. Which one, sir?";job.status="done";
+  }else{
+   const tree=eligible[0];job.treeId=tree.id;g.navigation={action:"CRUSH_TREE",treeId:tree.id,x:tree.x,z:tree.z};
+   p.moving=0;p.turn=0;p.turnRemaining=0;p.moveRemaining=null;
+   response="Delta: Tree identified. Steering to run it down.";
+  }
  }else if(f.action==="RESTART"){
   response="Restart available by voice or Play again.";
   job.status="done";
@@ -183,6 +202,7 @@ function jobComplete(g,job){
  if(f.action==="TRAVERSE")return f.degrees!==null&&p.gunTraverse===0;
  if(["ADVANCE","REVERSE"].includes(f.action))return f.distance!==null&&p.moveRemaining===0;
  if(f.action==="LOAD")return Boolean(g.loaded)&&(!f.ammo||g.loaded===f.ammo);
+ if(f.action==="CRUSH_TREE")return !g.navigation||g.navigation.treeId!==job.treeId&&job.treeId!==undefined;
  if(f.action==="ACQUIRE")return p.aimTime>1.8;
  if(f.action==="FIRE")return p.shotCount>job.startShots;
  return false;
@@ -299,8 +319,23 @@ export function observeCrewContacts(g){
  }
 }
 
+export function updateNavigation(g,dt){
+ const nav=g.navigation,p=g.player;if(!nav)return;
+ const target={x:nav.x,z:nav.z},range=distance(p,target);
+ if(range<8){
+  if(!g.crushedTrees.includes(nav.treeId))g.crushedTrees.push(nav.treeId);
+  g.navigation=null;p.moving=0;p.turn=0;p.turnRemaining=0;
+  g.message="Delta: Tree down. Tracks clear.";return;
+ }
+ const desired=bearing(p,target),error=diff(desired,p.hull);
+ const turn=clamp(error,-32*dt,32*dt);
+ p.hull=norm(p.hull+turn);p.turret=norm(p.turret+turn);g.view=norm(g.view+turn);
+ p.moving=Math.abs(error)>25?0:8;
+ if(p.moving)move(p,p.moving,dt,g);
+}
 export function step(g,dt){
  if(g.finished)return;dt=Math.min(dt,.08);g.elapsed+=dt;const p=g.player,e=g.enemy;
+ if(g.navigation)updateNavigation(g,dt);
  if(p.turn){const delta=p.turnRemaining===null?p.turn*dt:Math.sign(p.turn)*Math.min(Math.abs(p.turn*dt),p.turnRemaining);p.hull=norm(p.hull+delta);p.turret=norm(p.turret+delta);g.view=norm(g.view+delta);if(p.turnRemaining!==null){p.turnRemaining=Math.max(0,p.turnRemaining-Math.abs(delta));if(p.turnRemaining<.00001){p.turn=0;p.turnRemaining=0;g.message='Delta: Turn complete. Holding heading.';}}}
  if(p.gunTraverse){const delta=p.gunTraverseRemaining===null?p.gunTraverse*dt:Math.sign(p.gunTraverse)*Math.min(Math.abs(p.gunTraverse*dt),p.gunTraverseRemaining);p.turret=norm(p.turret+delta);if(p.gunTraverseRemaining!==null){p.gunTraverseRemaining=Math.max(0,p.gunTraverseRemaining-Math.abs(delta));if(p.gunTraverseRemaining<.00001){p.gunTraverse=0;p.gunTraverseRemaining=0;}}}
  if(p.moving)move(p,p.moving,dt,g);
