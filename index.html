@@ -1,1 +1,14 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><meta name="theme-color" content="#18211b"/><script src="./coi-serviceworker.js"></script><title>Shell Shock: Chasing Tail</title></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>
+<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover"/><meta name="theme-color" content="#18211b"/><script>window.coi={coepDegrade:()=>false};</script><script src="./coi-serviceworker.js"></script><script>
+if(navigator.serviceWorker){
+ navigator.serviceWorker.ready.then(()=>{
+  if(!navigator.serviceWorker.controller&&!sessionStorage.getItem('shell-shock-coi-reload')){
+   sessionStorage.setItem('shell-shock-coi-reload','1');location.reload();
+  }
+ });
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  if(!crossOriginIsolated&&!sessionStorage.getItem('shell-shock-coi-controller')){
+   sessionStorage.setItem('shell-shock-coi-controller','1');location.reload();
+  }
+ });
+}
+</script><title>Shell Shock: Chasing Tail</title></head><body><div id="app"></div><script type="module" src="/src/main.js"></script></body></html>
