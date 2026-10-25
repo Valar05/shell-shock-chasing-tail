@@ -94,6 +94,19 @@ try{
   throw Error('Compound voice commands did not execute: '+gameText);
  if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
   throw Error('Microphone is not an active toggle');
+ // Regression: crew speaker text must never be treated as a player command,
+ // even when the transcript starts with an addressed crew member name.
+ await voice.locator('#crew-audio').click();
+ await voice.evaluate(()=>{
+  const result=[{transcript:'Silver radio check crew audio online'}];result.isFinal=true;
+  window.__testRecognition.onresult({resultIndex:0,results:[result]});
+ });
+ await voice.waitForTimeout(800);
+ const echoState=await voice.locator('#voice-state').textContent();
+ if(!/Ignoring crew speaker audio/.test(echoState))
+  throw Error('Synthetic crew speech was not rejected: '+echoState);
+ if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
+  throw Error('Echo protection turned microphone off');
  await voice.close();
 
 await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
