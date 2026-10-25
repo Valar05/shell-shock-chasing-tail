@@ -12,10 +12,12 @@ const entries=execFileSync('unzip',['-Z1',zip]).toString().split('\n');
 const clipPath=entries.find(x=>/(?:^|\/)stop\/[^/]+\.wav$/.test(x));
 if(!clipPath)throw Error('Human speech STOP sample missing in mini dataset');
 const sample=execFileSync('unzip',['-p',zip,clipPath],{maxBuffer:200000}).toString('base64');
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--base','/shell-shock-chasing-tail/','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
+const remoteUrl=process.env.SHELL_SHOCK_TEST_URL||'';
+const localUrl='http://127.0.0.1:4183/shell-shock-chasing-tail/';
+const server=remoteUrl?null:spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--base','/shell-shock-chasing-tail/','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
 try{
- for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4183')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
+ if(!remoteUrl)for(let i=0;i<60;i++){try{if((await fetch(localUrl)).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
  browser=await chromium.launch({headless:true,args:['--use-gl=angle','--use-angle=swiftshader']});
  const page=await browser.newPage({viewport:{width:1000,height:700}});
  const errors=[],network=[];page.on('pageerror',e=>errors.push(String(e)));page.on('console',m=>{if(m.type()==='error')errors.push('console: '+m.text());});page.on('requestfailed',request=>network.push({url:request.url(),error:request.failure()?.errorText}));page.on('response',response=>{if(response.status()>=400)network.push({url:response.url(),status:response.status()});});
@@ -37,7 +39,8 @@ try{
    return dest.stream;
   };
  },sample);
- await page.goto('http://127.0.0.1:4183/shell-shock-chasing-tail/',{waitUntil:'domcontentloaded'});
+ await page.goto(remoteUrl||localUrl,{waitUntil:'domcontentloaded'});
+ if(remoteUrl){await page.waitForFunction(()=>window.crossOriginIsolated===true,null,{timeout:45000});await page.locator('#mic').waitFor({timeout:45000});}
  await page.locator('#mic').click();
  try{
   await page.waitForFunction(()=>document.querySelector('#voice-state')?.textContent?.includes('Moonshine browser speech listening'),null,{timeout:90000});
@@ -54,4 +57,4 @@ try{
  if(errors.length)throw Error('Page errors: '+errors.join('\\n'));
  console.log(JSON.stringify({result:'REAL_HUMAN_WAV_TRANSCRIPTION_PASS',text,game,latencyMs:Date.now()-started,
   captureRequests:await page.evaluate(()=>window.__voiceCaptureRequests)}));
-}finally{await browser?.close();server.kill();}
+}finally{await browser?.close();server?.kill();}
