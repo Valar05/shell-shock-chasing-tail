@@ -7,7 +7,7 @@ import {readFileSync,mkdirSync} from 'node:fs';
 const wav='/tmp/shell-shock-real-order.wav';
 execFileSync('espeak',['-v','en-us','-s','125','-w',wav,'advance']);
 const sample=readFileSync(wav).toString('base64');
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
 try{
  for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4183')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
