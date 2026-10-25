@@ -12,15 +12,16 @@ const ACTORS={
   alpha:"alpha",commander:"alpha"
 };
 const ROLES={
-  ADVANCE:"delta",REVERSE:"delta",HALT:"delta",TURN:"delta",
+  CRUSH_TREE:"delta",ADVANCE:"delta",REVERSE:"delta",HALT:"delta",TURN:"delta",
   TRAVERSE:"beta",ACQUIRE:"beta",FIRE:"beta",HOLD_FIRE:"beta",HEADING:"delta",
   LOAD:"gamma",REPORT:"silver",SPOT:"beta",RESTART:"alpha"
 };
 const SUBJECTS="driver|delta|chauffeur|gunner|beta|loader|gamma|silver|radio|operator|observer|alpha|commander";
 const subjectRx=new RegExp("\\b("+SUBJECTS+")\\b","gi");
-const ACTION_START=/\b(?:advance|proceed|drive|move|push|go|reverse|back(?:ward|wards)?|halt|stop|brake|turn|steer|rotate|pivot|traverse|slew|heading|head|face|orient|align|load|reload|chamber|select|fire|shoot|acquire|track|engage|report|status|sitrep|scan|look|hold|cease|restart|retry|spot|designate)\b/gi;
+const ACTION_START=/\b(?:run over|knock down|flatten|crush|advance|proceed|drive|move|push|go|reverse|back(?:ward|wards)?|halt|stop|brake|turn|steer|rotate|pivot|traverse|slew|heading|head|face|orient|align|load|reload|chamber|select|fire|shoot|acquire|track|engage|report|status|sitrep|scan|look|hold|cease|restart|retry|spot|designate)\b/gi;
 const NUMBER_WORDS={zero:0,one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12,thirteen:13,fourteen:14,fifteen:15,sixteen:16,seventeen:17,eighteen:18,nineteen:19,twenty:20,thirty:30,forty:40,fifty:50,sixty:60,seventy:70,eighty:80,ninety:90,hundred:100};
 const vocabulary=[
+  ["CRUSH_TREE",/\b(?:run over|knock down|flatten|crush|ram)\b(?=.*\b(?:tree|trees)\b)/],
   ["RESTART",/\b(restart|retry|new game|start over)\b/],
   ["SPOT",/\b(spot|designate|contact\s+(?:at|to|on)|enemy\s+(?:at|to|on)|target\s+(?:at|to|on)|bearing|azimuth|o'?clock)\b/],
   ["HOLD_FIRE",/\b(hold fire|cease fire|don't fire|do not fire)\b/],
