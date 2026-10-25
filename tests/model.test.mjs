@@ -91,3 +91,22 @@ test('run over that tree resolves through commander view and actually removes wo
  assert.ok(g.crushedTrees.includes(t.id),'tree should be run over and removed');
  assert.equal(g.navigation,null);
 });
+
+test('ambiguous near versus sighted tree asks before moving and accepts nearest follow-up',async()=>{
+ const {trees}=await import('../src/model.js');
+ const g=makeGame();
+ let near,far,spot;
+ for(const a of trees){
+  const p={x:a.x+7,z:a.z};
+  const b=trees.find(t=>t.id!==a.id&&distanceLocal(p,t)>40&&distanceLocal(p,t)<120);
+  if(b){near=a;far=b;spot=p;break;}
+ }
+ assert.ok(near&&far);
+ g.player.x=spot.x;g.player.z=spot.z;g.view=bearing(g.player,far);
+ const reply=command(g,'run over that tree');
+ assert.match(reply,/Nearest tree or the one you're looking at/i);
+ assert.equal(g.navigation,null,'ambiguous command must not move the tank');
+ assert.match(command(g,'nearest tree'),/nearest tree/i);
+ assert.equal(g.navigation.treeId,near.id,'explicit choice must target nearby tree');
+});
+function distanceLocal(a,b){return Math.hypot(a.x-b.x,a.z-b.z);}
