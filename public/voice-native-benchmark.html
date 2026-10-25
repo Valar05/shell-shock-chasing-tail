@@ -1,0 +1,31 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>Shell Shock Browser Native Voice Benchmark</title><style>body{font:16px system-ui;margin:2rem auto;padding:0 1rem;max-width:720px;background:#141923;color:#eef}button{margin:.4rem .4rem .4rem 0;padding:.8rem;border-radius:8px}pre{white-space:pre-wrap;overflow-wrap:anywhere}textarea{width:100%;height:10rem}small{color:#aaa}</style></head><body><h1>Browser-native speech benchmark</h1><p>SpeechRecognition using the physical microphone, paired with the standalone Android native ASR lab. Not a same-PCM comparison: platform echo processing and audio capture differ.</p><p id="status">Ready</p><section id="buttons"></section><button id="export">Copy JSON results</button><button id="save">Download JSON results</button><button id="reset">Clear results</button><pre id="rows"></pre><script type="module">
+const cases=[
+ ['compound','Thirty degrees to the left and run over that tree'],
+ ['halt','Driver halt'],
+ ['turn','Turn right forty degrees'],
+ ['negation','Do not fire'],
+ ['target','Beta fire on the machine gun']
+];
+const API=globalThis.SpeechRecognition||globalThis.webkitSpeechRecognition;
+const status=document.querySelector('#status'),view=document.querySelector('#rows'),rows=[];
+const show=()=>view.textContent=JSON.stringify({schema:'shellshock.asr.benchmark.v1',rows},null,2);
+const result=()=>JSON.stringify({schema:'shellshock.asr.benchmark.v1',rows},null,2);
+const add=(id,text)=>{const b=document.createElement('button');b.textContent=text;b.disabled=!API;b.onclick=()=>start(id);document.querySelector('#buttons').append(b)};
+cases.forEach(([id,text])=>add(id,text));
+if(!API)status.textContent='Native SpeechRecognition unsupported in this browser. This is not a failed transcription.';
+function start(id){
+ let active=true;const started=performance.now(),rec=new API();
+ rec.lang='en-US';rec.continuous=false;rec.interimResults=false;rec.maxAlternatives=1;
+ const row={case:id,engine:'browser-native',transcript:'',elapsedMs:null,confidence:null,error:null,input:'physical microphone',userAgent:navigator.userAgent};
+ rec.onresult=e=>{if(e.results[0]){row.transcript=e.results[0][0]?.transcript||'';row.confidence=Number.isFinite(e.results[0][0]?.confidence)?e.results[0][0].confidence:null}};
+ rec.onerror=e=>row.error=e.error;
+ rec.onend=()=>{
+  if(!active)return;active=false;row.elapsedMs=Math.round(performance.now()-started);rows.push(row);show();status.textContent='Recorded trial '+rows.length;
+ };
+ try{status.textContent='Listening for '+id+' ...';rec.start()}catch(e){row.error=e.message;rec.onend()}
+}
+document.querySelector('#export').onclick=async()=>{try{await navigator.clipboard.writeText(result());status.textContent='Copied results'}catch(e){status.textContent='Clipboard unavailable: '+e.message}};
+document.querySelector('#save').onclick=()=>{const blob=new Blob([result()],{type:'application/json'}),url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download='shell-shock-browser-asr.json';a.click();setTimeout(()=>URL.revokeObjectURL(url),2000)};
+document.querySelector('#reset').onclick=()=>{rows.length=0;show()};
+show();
+</script></body></html>
