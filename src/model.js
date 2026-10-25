@@ -46,7 +46,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},threatMemory:null,breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,moveRemaining:null,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -247,21 +247,46 @@ export function command(g,input){
 // station prevents constant radio spam and preserves distinctive perspectives.
 export function observeCrewContacts(g){
  const p=g.player,e=g.enemy;
- if(!g.contactReported)g.contactReported={delta:false,beta:false};
- if(!g.crewEvents)g.crewEvents=[];
+ g.contactReported ||= {delta:false,beta:false};
+ g.crewEvents ||= [];
  if(e.hp<=0)return;
- if(blocked(p,e,[],g.breaches))return;
  const target=bearing(p,e),range=Math.round(distance(p,e));
+ const obstructed=blocked(p,e,[],g.breaches);
+ const emit=(id,kind,message)=>{
+  g.crewEvents.push({speaker:id,id:id+'.'+kind,message,bearing:Math.round(target),range,priority:4});
+  if(g.crewEvents.length>20)g.crewEvents.shift();
+  g.message=message;
+ };
  const observers=[
-  {id:'delta',heading:p.hull,cone:35,message:'Delta: Armor ahead! Bearing '+Math.round(target)+' degrees, roughly '+range+' meters!'},
-  {id:'beta',heading:p.turret,cone:24,message:'Beta: Panzer in my sights! Bearing '+Math.round(target)+' degrees, roughly '+range+' meters!'}
+  {id:'delta',heading:p.hull,cone:35},
+  {id:'beta',heading:p.turret,cone:24}
  ];
  for(const o of observers){
-  if(g.contactReported[o.id]||Math.abs(diff(target,o.heading))>o.cone)continue;
-  g.contactReported[o.id]=true;g.enemySeen=true;
-  g.crewEvents.push({speaker:o.id,id:o.id+'.contact',message:o.message,bearing:Math.round(target),range,priority:4});
-  if(g.crewEvents.length>20)g.crewEvents.shift();
-  g.message=o.message;
+  const visible=!obstructed&&Math.abs(diff(target,o.heading))<=o.cone;
+  if(visible){
+   if(!g.threatMemory)g.threatMemory={x:e.x,z:e.z,bearing:Math.round(target),range,lastSeen:g.elapsed,observers:{},state:'visible'};
+   const m=g.threatMemory,old=m.observers[o.id];
+   m.x=e.x;m.z=e.z;m.bearing=Math.round(target);m.range=range;m.lastSeen=g.elapsed;
+   m.observers[o.id]={state:'visible',lastSeen:g.elapsed};
+   m.state='visible';g.enemySeen=true;g.contactReported[o.id]=true;
+   if(!old||old.state==='lost'){
+    const prefix=o.id==='beta'?(old?'Beta: Reacquired Panzer! Bearing ':'Beta: Panzer in my sights! Bearing '):(old?'Delta: Contact again! Bearing ':'Delta: Armor ahead! Bearing ');
+    emit(o.id,old?'reacquired':'contact',prefix+Math.round(target)+' degrees, roughly '+range+' meters!');
+   }
+  }else if(g.threatMemory?.observers[o.id]?.state==='visible'){
+   const m=g.threatMemory;
+   m.observers[o.id]={state:'lost',lastSeen:m.observers[o.id].lastSeen};
+   m.state='last-known';
+   const location=obstructed?'behind terrain':'outside my sight';
+   const prefix=o.id==='beta'?'Beta: Lost visual on Panzer ':'Delta: Lost sight of armor ';
+   emit(o.id,'lost',prefix+location+'. Last known bearing '+m.bearing+' degrees. Watching for it.');
+  }
+ }
+ const m=g.threatMemory;
+ if(m?.observers.beta?.state==='lost'&&!p.aim){
+  const phase=Math.sin((g.elapsed-m.observers.beta.lastSeen)*.55)*18;
+  const desired=norm(bearing(p,m)+phase);
+  p.turret=norm(p.turret+clamp(diff(desired,p.turret),-.17,.17));
  }
 }
 
