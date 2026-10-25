@@ -23,15 +23,24 @@ jobs:
       - run: npm run build -- --base=/shell-shock-chasing-tail/
       - run: node tests/voice-real-smoke.mjs
       - name: Whisper synthetic real-WAV benchmark (research only)
+        continue-on-error: true # failure recorded; don't mask downstream repeatability evidence
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y espeak-ng
           node tests/whisper-real-audio.mjs
           node tests/whisper-integrated-mic.mjs
+      - name: Repeated actual-audio reliability benchmark (research)
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y espeak-ng
+          set -o pipefail
+          VOICE_TRIALS=5 node tests/voice-reliability.mjs | tee /tmp/voice-reliability.log
       - uses: actions/upload-artifact@v4
+        if: always()
         with:
           name: shell-shock-web-build
           path: |
             dist/
             artifacts/
+            /tmp/voice-reliability.log
           if-no-files-found: error

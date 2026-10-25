@@ -1,0 +1,30 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Shell Shock native ASR comparator</title></head><body><main><h1>Native browser speech comparison (research only)</h1><p>Same WAV can be supplied to native recognition only where SpeechRecognition.start(audioTrack) is supported. No fallback to microphone may be silently substituted.</p><input id="wav" type="file" accept="audio/*"><button id="run">Start native track test</button><pre id="result" role="status">Idle</pre></main><script type="module">
+const display=document.querySelector('#result');const tell=x=>display.textContent=JSON.stringify(x,null,2);
+document.querySelector('#run').onclick=async()=>{
+ const file=document.querySelector('#wav').files[0];if(!file){tell({error:'Select actual WAV first'});return;}
+ const API=window.SpeechRecognition||window.webkitSpeechRecognition;
+ if(!API){tell({supported:false,reason:'SpeechRecognition API unavailable'});return;}
+ let context;let recognition;
+ try{
+  context=new AudioContext();
+  const data=await context.decodeAudioData(await file.arrayBuffer());
+  const out=context.createMediaStreamDestination();
+  const src=context.createBufferSource();src.buffer=data;src.connect(out);
+  const track=out.stream.getAudioTracks()[0];
+  recognition=new API();recognition.lang='en-US';recognition.continuous=false;recognition.interimResults=false;recognition.maxAlternatives=1;
+  const results=[],events=[];let ended=false;
+  const done=new Promise(resolve=>{
+   recognition.onresult=e=>{for(let i=e.resultIndex;i<e.results.length;i++)if(e.results[i].isFinal)results.push(e.results[i][0].transcript)};
+   recognition.onerror=e=>events.push({kind:'error',error:e.error,message:e.message});
+   recognition.onend=()=>{ended=true;resolve()};
+  });
+  await context.resume();
+  const at=performance.now();
+  // The only valid fair audio A/B path. Never call start() without the track in this test.
+  recognition.start(track);src.start();
+  await Promise.race([done,new Promise((_,reject)=>setTimeout(()=>reject(Error('Native result timeout')),20000))]);
+  tell({engine:'native SpeechRecognition',input:'original WAV through audioTrack',duration:data.duration,elapsedMs:Math.round(performance.now()-at),transcripts:results,events,ended});
+ }catch(e){tell({engine:'native SpeechRecognition',supported:'unverified',error:String(e.message||e),note:'Native start(audioTrack) may be unsupported here; not equivalent to microphone recognition.'})}
+ finally{try{recognition?.abort()}catch{};await context?.close()}
+};
+</script></body></html>
