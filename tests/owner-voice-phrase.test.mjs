@@ -17,3 +17,11 @@ test('an explicitly directional compound phrase retains both orders',()=>{
  assert.equal(p.frames[0].direction,'right');
  assert.equal(p.frames[0].degrees,30);
 });
+
+test('actual corrected spoken command splits angle and tree objective',()=>{
+ const p=parseTransmission('30 degrees to the left and run over that tree');
+ assert.equal(p.ok,true,JSON.stringify(p.errors));
+ assert.deepEqual(p.frames.map(f=>f.action),['TURN','CRUSH_TREE']);
+ assert.equal(p.frames[0].direction,'left');
+ assert.equal(p.frames[0].degrees,30);
+});
