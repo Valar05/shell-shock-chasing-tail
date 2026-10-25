@@ -46,7 +46,7 @@ export function move(tank,speed,dt,g=null){
 }
 export function makeGame(seed=1){
  const variation=(seed%5)*7;
- return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
+ return {seed,elapsed:0,finished:null,view:5,message:'Silver: Road ahead. Possible armor near the orchard.',loaded:null,selected:'AP',loading:0,commands:[],enemySeen:false,crewEvents:[],contactReported:{delta:false,beta:false},breaches:[],pendingFrames:[],orderJobs:[],orderPacketId:0,
  player:{x:-4,z:1,hull:8,turret:8,hp:100,reload:0,moving:0,moveRemaining:null,turn:0,turnRemaining:0,gunTraverse:0,gunTraverseRemaining:0,aim:null,aimError:0,aimTime:0,shotCount:0},
  enemy:{x:68+variation,z:196,hull:190,turret:190,hp:100,reload:6,moving:0,turn:0,aim:null,aimTime:0,shotCount:0,alert:false}
  };}
@@ -241,11 +241,36 @@ export function command(g,input){
  return receipts.join(" | ")||"Silver: No executable order.";
 }
 
+
+// Each station can independently observe a contact within its actual field of
+// view, provided terrain does not occlude it. One first-contact report per
+// station prevents constant radio spam and preserves distinctive perspectives.
+export function observeCrewContacts(g){
+ const p=g.player,e=g.enemy;
+ if(!g.contactReported)g.contactReported={delta:false,beta:false};
+ if(!g.crewEvents)g.crewEvents=[];
+ if(e.hp<=0)return;
+ if(blocked(p,e,[],g.breaches))return;
+ const target=bearing(p,e),range=Math.round(distance(p,e));
+ const observers=[
+  {id:'delta',heading:p.hull,cone:35,message:'Delta: Armor ahead! Bearing '+Math.round(target)+' degrees, roughly '+range+' meters!'},
+  {id:'beta',heading:p.turret,cone:24,message:'Beta: Panzer in my sights! Bearing '+Math.round(target)+' degrees, roughly '+range+' meters!'}
+ ];
+ for(const o of observers){
+  if(g.contactReported[o.id]||Math.abs(diff(target,o.heading))>o.cone)continue;
+  g.contactReported[o.id]=true;g.enemySeen=true;
+  g.crewEvents.push({speaker:o.id,id:o.id+'.contact',message:o.message,bearing:Math.round(target),range,priority:4});
+  if(g.crewEvents.length>20)g.crewEvents.shift();
+  g.message=o.message;
+ }
+}
+
 export function step(g,dt){
  if(g.finished)return;dt=Math.min(dt,.08);g.elapsed+=dt;const p=g.player,e=g.enemy;
  if(p.turn){const delta=p.turnRemaining===null?p.turn*dt:Math.sign(p.turn)*Math.min(Math.abs(p.turn*dt),p.turnRemaining);p.hull=norm(p.hull+delta);p.turret=norm(p.turret+delta);g.view=norm(g.view+delta);if(p.turnRemaining!==null){p.turnRemaining=Math.max(0,p.turnRemaining-Math.abs(delta));if(p.turnRemaining<.00001){p.turn=0;p.turnRemaining=0;g.message='Delta: Turn complete. Holding heading.';}}}
  if(p.gunTraverse){const delta=p.gunTraverseRemaining===null?p.gunTraverse*dt:Math.sign(p.gunTraverse)*Math.min(Math.abs(p.gunTraverse*dt),p.gunTraverseRemaining);p.turret=norm(p.turret+delta);if(p.gunTraverseRemaining!==null){p.gunTraverseRemaining=Math.max(0,p.gunTraverseRemaining-Math.abs(delta));if(p.gunTraverseRemaining<.00001){p.gunTraverse=0;p.gunTraverseRemaining=0;}}}
  if(p.moving)move(p,p.moving,dt,g);
+ observeCrewContacts(g);
  if(g.loading>0){g.loading-=dt;if(g.loading<=0){g.loaded=g.selected;g.message='Gamma: '+g.loaded+' loaded.';}}
  if(!g.enemySeen&&!blocked(p,e,[],g.breaches)&&Math.abs(diff(g.view,bearing(p,e)))<13){g.enemySeen=true;g.message='Silver: Enemy Panzer! Bearing '+Math.round(bearing(p,e))+'!';}
  if(e.hp>0){
