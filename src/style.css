@@ -48,3 +48,7 @@ html,body,#app{height:100%;height:100dvh;width:100%;overscroll-behavior:none}
 #viewport,#hud{width:100%;max-width:100%;overflow:hidden}
 #app{position:fixed;inset:0;width:100vw;height:100dvh;overflow:hidden}
 #compass{max-width:calc(100vw - 28px)}
+
+#crew-audio{min-height:40px;padding:6px 10px;white-space:nowrap;background:#374b40;border-color:#b6bc8c;font-weight:650}#crew-audio[aria-pressed="true"]{background:#647b4b;border-color:#e3dba6}#crew-audio:disabled{opacity:.6}
+@media(max-width:600px){#crew-audio{min-height:45px;width:100%;font-size:13px}}
+@media(orientation:landscape) and (max-height:600px){#voice-panel{flex-wrap:wrap}#crew-audio{width:auto;min-height:40px;font-size:12px}}
