@@ -4,7 +4,7 @@ import {createFilteredSpeechInput} from './filtered-speech-input.js';
 import {createBrowserWasmRecognizer} from './wasm-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
-import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
+import {makeGame,step,command,designate,terrainHeight,obstacles,trees,bearing,norm,diff} from './model.js';
 import './style.css';
 const root=document.querySelector('#app');
 root.innerHTML=`<div id="viewport"></div><div id="hud"><div id="title">SHELL SHOCK <small>CHASING TAIL · ORCHARD CONTACT</small></div><div id="bearings"></div><div id="compass" aria-label="Compass and viewing bearing"><div id="compass-ticks"></div><div id="compass-center">▼</div></div><div id="status"></div><div id="message"></div><div id="end-screen" hidden role="alertdialog" aria-live="assertive"><strong id="end-title"></strong><p id="end-caption"></p><button id="end-restart" type="button">↻ Play again</button></div><div id="orders"><div id="voice-panel"><button id="mic" type="button" aria-pressed="false">🎙️ Start voice command</button><button id="crew-audio" type="button" aria-pressed="false">🔊 Crew voices OFF</button><span id="voice-state" role="status" aria-live="polite">Tap microphone and speak to your crew</span></div><details id="type-fallback"><summary>Keyboard commands (alternative)</summary><form id="form"><input id="order" placeholder="Command your crew…" autocomplete="off" aria-label="Command your crew"/><button>Issue order</button></form></details><div id="shortcuts"><button data-order="Silver report">Report</button><button data-order="Delta advance">Advance</button><button data-order="Delta halt">Halt</button><button data-order="Delta reverse">Reverse</button><button data-order="Delta left">Turn left</button><button data-order="Delta right">Turn right</button><button data-order="Beta acquire">Acquire</button><button data-order="Gamma load AP">Load AP</button><button data-order="Beta fire">Fire</button><button id="restart" type="button">Restart</button></div></div></div>`;
@@ -24,9 +24,9 @@ function billboard(texture,w,h,x,z,y=0){const m=new THREE.Mesh(new THREE.PlaneGe
 const environment=[];
 for(const [id,o] of obstacles.entries()){const isHouse=o.type==='house',t=isHouse?houseTexture(false):hedgeTexture;const m=billboard(t,Math.max(o.w,16),isHouse?18:7,o.x,o.z);if(o.type==='hedge')m.rotation.y=o.d>o.w?Math.PI/2:0;
 environment.push({id,o,m,breached:false});}
-for(let i=0;i<48;i++){const x=Math.sin(i*43.17)*175,z=(i*47)%250;if(obstacles.some(o=>Math.abs(x-o.x)<o.w/2+9&&Math.abs(z-o.z)<o.d/2+9))continue;const tree=billboard(treeTexture,13,18,x,z);tree.userData.cameraFacing=true;}
+const treeMeshes=[];for(const t of trees){const tree=billboard(treeTexture,13,18,t.x,t.z);tree.userData.cameraFacing=true;treeMeshes.push({id:t.id,mesh:tree});}
 const enemySprite=billboard(tankTexture,13,11,0,0);
-function drawWorld(){const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(-e.x,5.5,e.z);
+function drawWorld(){for(const t of treeMeshes)t.mesh.visible=!g.crushedTrees.includes(t.id);const e=g.enemy;enemySprite.visible=e.hp>0;enemySprite.position.set(-e.x,5.5,e.z);
 enemySprite.lookAt(camera.position.x,5.5,camera.position.z);
 scene.traverse(obj=>{if(obj.userData?.cameraFacing)obj.lookAt(camera.position.x,obj.position.y,camera.position.z);});
 for(const item of environment){if(item.o.type==='house'&&g.breaches.some(b=>b.id===item.id)&&!item.breached){item.breached=true;item.m.material.map=houseTexture(true);item.m.material.needsUpdate=true;}}
