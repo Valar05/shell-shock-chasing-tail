@@ -1,7 +1,7 @@
 name: Build and test
 on:
   push:
-    branches: [main, 'research/browser-voice-release-gate-20261024']
+    branches: [main, 'research/browser-voice-release-gate-20261024', 'research/full-spoken-command-regression-20261025']
   pull_request:
   workflow_dispatch:
 permissions:
@@ -22,6 +22,8 @@ jobs:
       - run: node tests/browser-smoke.mjs
       - run: npm run build -- --base=/shell-shock-chasing-tail/
       - run: node tests/voice-real-smoke.mjs
+      - run: sudo apt-get update -qq && sudo apt-get install -y -qq espeak
+      - run: VOICE_PHRASE='driver run over that tree' EXPECT_RESPONSE='Tree identified' VOICE_SYNTH='en-us+f3' node tests/voice-full-command.mjs
       - uses: actions/upload-artifact@v4
         with:
           name: shell-shock-web-build
