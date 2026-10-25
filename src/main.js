@@ -107,7 +107,7 @@ function commanderBargeIn(t){
  return parseTransmission(t).ok;
 }
 let partial='';
-const voiceEngine=new URLSearchParams(location.search).get('voice')==='whisper'?createWhisperRecognizer:createMoonshineRecognizer;
+const voiceEngine=new URLSearchParams(location.search).get('voice')==='moonshine'?createMoonshineRecognizer:createWhisperRecognizer;
 const wasmVoice=voiceEngine({
  input:filteredInput,
  load:import.meta.env.DEV&&new URLSearchParams(location.search).has('voice-test')?options=>window.__voiceTestLoad(options):undefined,
