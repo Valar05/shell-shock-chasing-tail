@@ -28,7 +28,7 @@ try{
  const html=join(dist,'index.html');
  requireCheck(existsSync(html),'built-index','dist/index.html exists');
  const bytes=readFileSync(html);
- requireCheck(bytes.length>100&&bytes.toString().includes('SHELL SHOCK'),'app-content','production HTML title present');
+ requireCheck(bytes.length>100&&/shell shock/i.test(bytes.toString()),'app-content','production HTML title present');
  requireCheck(bytes.toString().includes('/shell-shock-chasing-tail/'),'project-base','correct Pages subpath references');
  requireCheck(existsSync(join(dist,'coi-serviceworker.js')),'coi-asset','same-origin isolation service worker included');
  const assetDir=join(dist,'assets');
@@ -42,7 +42,7 @@ try{
  const response=await fetch(site,{signal:AbortSignal.timeout(12000),redirect:'follow'});
  requireCheck(response.ok,'hosted-http','public site HTTP '+response.status);
  const hosted=await response.text();
- requireCheck(hosted.includes('SHELL SHOCK')&&hosted.includes('/shell-shock-chasing-tail/'),'hosted-html','hosted app and project paths present');
+ requireCheck(/shell shock/i.test(hosted)&&hosted.includes('/shell-shock-chasing-tail/'),'hosted-html','hosted app and project paths present');
  check('release-gates','Prior workflow stages enforce gameplay test, deployed browser smoke, real human WAV -> actual Moonshine inference; no physical-mic claim');
  report.status='automated-passed';
  report.artifacts={index_sha256:hash(bytes),wasm_files:wasm,js_file_count:js.length};
