@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {createSpeechPacketizer} from './speech-packetizer.js';
+import {createFilteredSpeechInput} from './filtered-speech-input.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
@@ -89,13 +90,37 @@ function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){restartGame();return;}g.message=command(g,s);renderHud();}
 const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voice-state');
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-let recognition=null,listening=false,wantListening=false,restartTimer=null;
+let recognition=null,listening=false,wantListening=false,restartTimer=null,starting=false,filteredUnavailable=false;
+const filteredInput=createFilteredSpeechInput();
+let micMode='standard';
 function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
 const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.resume();},status:msg=>voiceState.textContent=msg});
-function retryListening(){if(!wantListening||listening)return;clearTimeout(restartTimer);restartTimer=setTimeout(()=>{if(!wantListening||listening)return;try{recognition.start();}catch{updateVoice('Microphone paused. Tap OFF then ON to retry.');}},300);}
+async function startRecognition(){
+ if(!wantListening||listening||starting)return;
+ starting=true;
+ try{
+  if(!filteredUnavailable&&filteredInput.supported()){
+   try{
+    const {track,settings}=await filteredInput.prepare();
+    if(!wantListening)return;
+    recognition.start(track);
+    micMode='filtered';
+    voiceState.textContent='Filtered mic · AEC '+(settings.echoCancellation===true?'on':'requested')+' · noise suppression '+(settings.noiseSuppression===true?'on':'requested');
+    return;
+   }catch(error){
+    filteredUnavailable=true;
+    console.warn('Filtered microphone track unavailable, using browser recognition fallback',error);
+    await filteredInput.close();
+   }
+  }
+  if(wantListening){recognition.start();micMode='standard';voiceState.textContent='Browser microphone fallback · filtered-track recognition unavailable';}
+ }catch(error){updateVoice('Speech input unavailable: '+(error?.message||'check microphone permission'));}
+ finally{starting=false;}
+}
+function retryListening(){if(!wantListening||listening||starting)return;clearTimeout(restartTimer);restartTimer=setTimeout(startRecognition,300);}
 if(SpeechRecognition){
  recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
- recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
+ recognition.onstart=()=>{listening=true;updateVoice(micMode==='filtered'?'Filtered microphone listening':'Browser microphone listening · fallback');};
  recognition.onresult=ev=>{
  const changed=Array.from(ev.results).slice(ev.resultIndex||0);
  const text=changed.map(r=>r[0]?.transcript||'').join(' ').trim();
@@ -111,9 +136,9 @@ if(SpeechRecognition){
  if(crewSpeaking)crewVoice.interrupt();
  speechPackets.receive(ev);
 };
- recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
+ recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);filteredInput.close();}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
  recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
- mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
+ mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();filteredInput.close();}});
 }else{mic.disabled=true;updateVoice('Speech recognition unavailable in this browser. Try Chrome or keyboard fallback.');}
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
