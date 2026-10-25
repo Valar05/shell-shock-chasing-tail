@@ -107,6 +107,14 @@ try{
   throw Error('Synthetic crew speech was not rejected: '+echoState);
  if(await voice.locator('#mic').getAttribute('aria-pressed')!=='true')
   throw Error('Echo protection turned microphone off');
+ // Speech must ignore unrelated music fragments while crew audio plays.
+ await voice.evaluate(()=>{
+   const result=[{transcript:'music playing loud chorus tonight'}];result.isFinal=false;
+   window.__testRecognition.onresult({resultIndex:1,results:[{0:{transcript:'Driver advance and turn 20 degrees left'},isFinal:true},result]});
+ });
+ await voice.waitForTimeout(100);
+ const nonCommand=await voice.locator('#voice-state').textContent();
+ if(/Heard: music playing loud chorus/.test(nonCommand))throw Error('Music fragment entered crew order packet');
  await voice.close();
 
 await page.screenshot({path:'artifacts/first-playable-smoke.png',fullPage:true});
