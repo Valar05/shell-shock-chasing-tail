@@ -102,6 +102,19 @@ function resolveBearing(g,reference){
  const offsets={ahead:0,front:0,forward:0,left:-90,port:-90,right:90,starboard:90,behind:180,rear:180};
  return norm(g.player.hull+offsets[reference.value]);
 }
+function reportQuery(g,frame){
+ const p=g.player,type=frame.queryType;
+ const who=frame.actor==="silver"?"Silver":frame.actor==="beta"?"Beta":frame.actor==="gamma"?"Gamma":frame.actor==="delta"?"Delta":"Alpha";
+ if(type==="HEADING")return who+": Hull "+Math.round(p.hull)+" degrees, gun "+Math.round(p.turret)+" degrees, viewing "+Math.round(g.view)+" degrees.";
+ if(type==="MOTION")return "Delta: "+(p.moving===0?"Stationary.":p.moving>0?"Advancing.":"Reversing.")+(p.moveRemaining!=null?" "+p.moveRemaining.toFixed(1)+" meters remaining.":"");
+ if(type==="AMMO")return "Gamma: "+(g.loaded?g.loaded+" loaded.":g.loading>0?"Loading "+g.selected+".":"Gun empty; "+g.selected+" selected.");
+ if(type==="GUN")return "Beta: "+(p.aimTime>1.8?"Gun laid.":"Not laid.")+(p.aim?" Tracking designated contact.":" No designated target.");
+ if(type==="CONTACT"||type==="OBSERVATION")return g.enemySeen?"Silver: Enemy armor confirmed bearing "+Math.round(bearing(p,g.enemy))+" degrees.":"Silver: No confirmed armor contact. Visibility is limited.";
+ if(type==="CAPABILITY")return "Silver: Delta drives and turns; Beta traverses, acquires, fires; Gamma loads; I report and relay. Give compound orders with and, while, or then.";
+ if(type==="OBJECTIVE")return "Silver: Identify and defeat the opposing armored contact. Keep our tank operational.";
+ return "Silver: Armor "+Math.max(0,Math.round(p.hp))+" percent. Hull "+Math.round(p.hull)+" degrees. "+(g.enemySeen?"Contact confirmed.":"No confirmed contact.")+" Gun "+(g.loaded||"empty")+".";
+}
+
 function executeFrame(g,job){
  const f=job.frame,p=g.player;
  job.status="running";
@@ -146,7 +159,7 @@ function executeFrame(g,job){
   response="Beta: Holding fire.";
   job.status="done";
  }else if(f.action==="REPORT"){
-  response=legacyCommand(g,"Silver report");
+  response=f.queryType?reportQuery(g,f):legacyCommand(g,"Silver report");
   job.status="done";
  }else if(f.action==="SPOT"){
   const indicated=resolveBearing(g,f.bearing);
