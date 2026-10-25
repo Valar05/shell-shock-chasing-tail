@@ -108,9 +108,8 @@ const wasmVoice=createBrowserWasmRecognizer({
  onFinal:text=>{
   if(isCrewEcho(text)){voiceState.textContent='Ignoring crew speaker audio';return;}
   if(crewSpeaking)crewVoice.interrupt();
-  // Vosk emits completed utterances rather than WebSpeech result indices.
-  const result=[{transcript:text}];result.isFinal=true;
-  speechPackets.receive({resultIndex:0,results:[result]});
+  // Vosk results are already complete utterances, not WebSpeech slot arrays.
+  issue(text);crewVoice.resume();voiceState.textContent='Command sent: '+text;
  },
  onStatus:message=>voiceState.textContent=message
 });
