@@ -1,6 +1,10 @@
 // Canonical dialogue IDs. Audio backend is replaceable without changing game rules.
 // Stable IDs become Pocket TTS filenames later: crew/<speaker>/<id>.wav.
 export const CREW_LINES=Object.freeze({
+ 'delta.lost':{speaker:'delta',priority:4,text:'Lost sight of armor {location}. Last known bearing {bearing} degrees.'},
+ 'delta.reacquired':{speaker:'delta',priority:4,text:'Contact again! Bearing {bearing}, roughly {range} meters.'},
+ 'beta.lost':{speaker:'beta',priority:4,text:'Lost visual on Panzer {location}. Last known bearing {bearing} degrees. Watching for it.'},
+ 'beta.reacquired':{speaker:'beta',priority:4,text:'Reacquired Panzer! Bearing {bearing}, roughly {range} meters.'},
  'delta.contact':{speaker:'delta',priority:4,text:'Armor ahead! Bearing {bearing}, roughly {range} meters!'},
  'beta.contact':{speaker:'beta',priority:4,text:'Panzer in my sights! Bearing {bearing}, roughly {range} meters!'},
  'delta.advance':{speaker:'delta',priority:1,text:'Advancing, sir.'},
@@ -40,6 +44,10 @@ export function makeCrewLine(id,values={}){
 }
 export function classifyCrewMessage(message=''){
  const m=String(message);
+ const lost=m.match(/^(Beta|Delta): (?:Lost visual on Panzer|Lost sight of armor) (behind the farmhouse|behind the hedgerow|outside my sight)\. Last known bearing (\d+) degrees/i);
+ if(lost)return makeCrewLine(lost[1].toLowerCase()+'.lost',{location:lost[2],bearing:lost[3]});
+ const reacquired=m.match(/^(Beta|Delta): (?:Reacquired Panzer|Contact again)! Bearing (\d+) degrees, roughly (\d+) meters/i);
+ if(reacquired)return makeCrewLine(reacquired[1].toLowerCase()+'.reacquired',{bearing:reacquired[2],range:reacquired[3]});
  if(/Delta: Armor ahead/i.test(m))return makeCrewLine('delta.contact',{bearing:m.match(/bearing\s+(\d+)/i)?.[1]||'unknown',range:m.match(/roughly\s+(\d+)/i)?.[1]||'unknown'});
  if(/Beta: Panzer in my sights/i.test(m))return makeCrewLine('beta.contact',{bearing:m.match(/bearing\s+(\d+)/i)?.[1]||'unknown',range:m.match(/roughly\s+(\d+)/i)?.[1]||'unknown'});
  if(/Delta: Turn complete/i.test(m))return makeCrewLine('delta.turn.complete');
