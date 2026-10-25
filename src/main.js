@@ -3,6 +3,7 @@ import {createSpeechPacketizer} from './speech-packetizer.js';
 import {parseTransmission} from './command-parser.js';
 import {createFilteredSpeechInput} from './filtered-speech-input.js';
 import {createMoonshineRecognizer} from './moonshine-speech-recognizer.js';
+import {createWhisperRecognizer} from './whisper-speech-recognizer.js';
 import {createCrewVoice} from './crew-voice.js';
 import {makeCrewLine} from './crew-dialogue.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,trees,bearing,norm,diff} from './model.js';
@@ -106,7 +107,8 @@ function commanderBargeIn(t){
  return parseTransmission(t).ok;
 }
 let partial='';
-const wasmVoice=createMoonshineRecognizer({
+const voiceEngine=new URLSearchParams(location.search).get('voice')==='whisper'?createWhisperRecognizer:createMoonshineRecognizer;
+const wasmVoice=voiceEngine({
  input:filteredInput,
  load:import.meta.env.DEV&&new URLSearchParams(location.search).has('voice-test')?options=>window.__voiceTestLoad(options):undefined,
  onPartial:text=>{
