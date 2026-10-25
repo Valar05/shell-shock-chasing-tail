@@ -1,7 +1,7 @@
 import {classifyCrewMessage} from './crew-dialogue.js';
 
 // The browser voice backend is intentionally replaceable with recorded Pocket TTS.
-export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,onState=()=>{},isRelevant=()=>true}={}){
+export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=globalThis.SpeechSynthesisUtterance,onState=()=>{},isRelevant=()=>true,resolveInterrupted=line=>isRelevant(line)?line:null}={}){
  let enabled=false,voiceMap={},lastKey='',lastTime=0,activePriority=0,active=false,queue=[];
  let current=null,suspended=null,interrupted=false,generation=0;
  const available=()=>Boolean(synthesis&&Utterance);
@@ -45,15 +45,7 @@ export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=
  function interrupt(){
   if(!enabled||interrupted)return false;
   interrupted=true;
-  if(current){
-   const {line,position}=current;
-   // Resume at the most recent word boundary where speech synthesis reports one.
-   // If the platform does not provide boundaries, replay the whole short line.
-   let offset=Math.max(0,Math.min(position,line.text.length));
-   while(offset>0&&offset<line.text.length&&!/\s/.test(line.text[offset-1]))offset--;
-   const remaining=line.text.slice(offset).trim();
-   if(remaining)suspended={...line,text:remaining};
-  }
+  if(current)suspended=current.line;
   generation++;active=false;current=null;activePriority=0;
   synthesis?.cancel?.();onState('interrupted');
   return true;
@@ -61,12 +53,12 @@ export function createCrewVoice({synthesis=globalThis.speechSynthesis,Utterance=
  function resume(){
   if(!interrupted)return false;
   interrupted=false;
-  if(suspended&&isRelevant(suspended)){
-   // New command acknowledgments queued during interruption speak first.
-   // The subordinate then finishes the interrupted report.
-   queue.push(suspended);suspended=null;
-  }
+  const old=suspended;suspended=null;
+  // Compute fresh dialogue from present game state, never replay clipped audio.
+  const renewed=old?resolveInterrupted(old):null;
   while(queue.length&&!isRelevant(queue[0]))queue.shift();
+  const highest=queue.reduce((max,item)=>Math.max(max,item.priority||0),-1);
+  if(renewed&&isRelevant(renewed)&&highest<(renewed.priority||0))queue.push(renewed);
   if(!active&&queue.length)say(queue.shift(),true);
   else onState(enabled?'ready':'off');
   return true;
