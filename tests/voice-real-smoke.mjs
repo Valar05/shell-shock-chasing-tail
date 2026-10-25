@@ -12,7 +12,7 @@ const entries=execFileSync('unzip',['-Z1',zip]).toString().split('\n');
 const clipPath=entries.find(x=>/(?:^|\/)stop\/[^/]+\.wav$/.test(x));
 if(!clipPath)throw Error('Human speech STOP sample missing in mini dataset');
 const sample=execFileSync('unzip',['-p',zip,clipPath],{maxBuffer:200000}).toString('base64');
-const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
+const server=spawn(process.execPath,['node_modules/vite/bin/vite.js','preview','--base','/shell-shock-chasing-tail/','--host','127.0.0.1','--port','4183','--strictPort'],{stdio:'ignore'});
 let browser;
 try{
  for(let i=0;i<60;i++){try{if((await fetch('http://127.0.0.1:4183')).ok)break;}catch{}await new Promise(r=>setTimeout(r,250));}
