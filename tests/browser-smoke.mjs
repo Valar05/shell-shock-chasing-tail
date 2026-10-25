@@ -12,6 +12,8 @@ try{
  await page.goto('http://127.0.0.1:4173',{waitUntil:'networkidle'});
  await page.locator('#viewport canvas').waitFor();
  await page.locator('#mic').waitFor();
+ await page.locator('#crew-audio').waitFor();
+ if(!(await page.locator('#crew-audio').isVisible()))throw Error('Crew audio toggle missing');
  if(!(await page.locator('#mic').isVisible()))throw Error('Primary microphone control missing');
  await page.locator('#type-fallback').evaluate(e=>e.open=true);
  const before=await page.locator('#bearings').textContent();
