@@ -177,16 +177,19 @@ function executeFrame(g,job){
   }else response="Silver: No confirmed target at bearing "+Math.round(indicated)+" degrees.";
   job.status="done";
  }else if(f.action==="CRUSH_TREE"){
+  // Explicit "30 degrees left" means an exact relative bearing from the
+  // current sightline. Only use screen-center selection when none is supplied.
+  const reference=f.targetOffset===null?g.view:norm(g.view+(f.direction==="left"?-1:1)*f.targetOffset);
   const eligible=trees.filter(t=>!g.crushedTrees.includes(t.id)&&distance(p,t)>9&&distance(p,t)<150)
-   .map(t=>({...t,angle:Math.abs(diff(bearing(p,t),g.view)),range:distance(p,t)}))
-   .filter(t=>t.angle<22).sort((a,b)=>a.angle-b.angle||a.range-b.range);
+   .map(t=>({...t,angle:Math.abs(diff(bearing(p,t),reference)),range:distance(p,t)}))
+   .filter(t=>t.angle<(f.targetOffset===null?22:10)).sort((a,b)=>a.angle-b.angle||a.range-b.range);
   if(!eligible.length){response="Delta: I can't identify a tree in your sightline. Look toward one and repeat the order.";job.status="done";}
   else if(eligible.length>1&&eligible[1].angle-eligible[0].angle<4&&Math.abs(eligible[1].range-eligible[0].range)<20){
    response="Delta: Multiple trees on that bearing. Which one, sir?";job.status="done";
   }else{
    const tree=eligible[0];job.treeId=tree.id;g.navigation={action:"CRUSH_TREE",treeId:tree.id,x:tree.x,z:tree.z};
    p.moving=0;p.turn=0;p.turnRemaining=0;p.moveRemaining=null;
-   response="Delta: Tree identified. Steering to run it down.";
+   response="Delta: Tree identified"+(f.targetOffset===null?"":", "+f.targetOffset+" degrees "+f.direction+" of your sightline")+". Steering to run it down.";
   }
  }else if(f.action==="RESTART"){
   response="Restart available by voice or Play again.";
