@@ -36,6 +36,7 @@ const vocabulary=[
   ["ADVANCE",/\b(advance|proceed|drive|move|push|forward|ahead|continue|keep moving|go forward|go ahead|take us|bring us)\b/]
 ];
 
+const ASR_ACTION_CORRECTIONS={advancd:"advance",advnace:"advance",advanced:"advance",advancing:"advance",advnced:"advance",advanc:"advance",trun:"turn",tern:"turn",turm:"turn",haltt:"halt",revers:"reverse",reverce:"reverse",travers:"traverse",traversed:"traverse",fier:"fire",fiire:"fire",reaload:"reload",reloaded:"reload",gunnerd:"gunner"};
 export function normalizeSpeech(input){
   return String(input??"").toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
@@ -43,6 +44,7 @@ export function normalizeSpeech(input){
     .replace(/\b(?:uh+|um+|please|kindly)\b/g," ")
     .replace(/\b(?:go ahead and|would you|could you|can you)\b/g," ")
     .replace(/\b(\w+)(?:\s+\1\b)+/g,"$1")
+    .replace(/\b[a-z]+\b/g,word=>ASR_ACTION_CORRECTIONS[word]||word)
     .replace(/\s+/g," ").trim();
 }
 function numeric(s){
@@ -73,7 +75,7 @@ export function parseAmount(raw,kind){
 function splitSections(text){
   // Preserve connectors as graph edges. "and" between two verbs stays inside
   // a concurrent packet; "then" creates an explicit dependency.
-  const connectors=/(\s*[;.!?]\s*|\s+and then\s+|\s+then\s+|\s+after that\s+|\s+while\s+|\s+meanwhile\s+|\s+and\s+(?=(?:driver|delta|chauffeur|gunner|beta|loader|gamma|silver|radio|observer)\b))/gi;
+  const connectors=/(\s*[;.!?]+\s*|\s+and then\s+|\s+then\s+|\s+after that\s+|\s+while\s+|\s+meanwhile\s+|\s+and\s+(?=(?:driver|delta|chauffeur|gunner|beta|loader|gamma|silver|radio|observer|commander|alpha)\b))/gi;
   const parts=text.split(connectors),out=[];
   let relation="FIRST";
   for(const part of parts){
