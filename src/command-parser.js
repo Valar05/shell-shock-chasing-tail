@@ -37,6 +37,70 @@ const vocabulary=[
 ];
 
 const ASR_ACTION_CORRECTIONS={advancd:"advance",advnace:"advance",advanced:"advance",advancing:"advance",advnced:"advance",advanc:"advance",trun:"turn",tern:"turn",turm:"turn",haltt:"halt",revers:"reverse",reverce:"reverse",travers:"traverse",traversed:"traverse",fier:"fire",fiire:"fire",reaload:"reload",reloaded:"reload",gunnerd:"gunner"};
+
+// Constrained speech lattice: correct a *command slot* only, never a number,
+// bearing, negative, crew name, or target. This avoids hallucinated orders.
+const ACTION_LEXICON=[
+ "advance","forward","proceed","drive","move","push","reverse","back","halt","stop",
+ "turn","steer","rotate","pivot","traverse","slew","heading","face","orient","align",
+ "load","reload","chamber","select","fire","shoot","acquire","track","engage",
+ "report","status","sitrep","scan","look","hold","cease","restart","retry","spot","designate"
+];
+const ACTION_SPEECH_SYNONYMS={
+ "advanced":"advance","advancing":"advance","advancd":"advance","advnace":"advance",
+ "advnced":"advance","advanc":"advance","advenced":"advance","advans":"advance",
+ "foward":"forward","forword":"forward","forwards":"forward","reverce":"reverse",
+ "revers":"reverse","reversed":"reverse","reversing":"reverse",
+ "turnt":"turn","turning":"turn","trun":"turn","tern":"turn",
+ "traversed":"traverse","traversing":"traverse","travers":"traverse",
+ "fired":"fire","firing":"fire","fier":"fire","fiire":"fire",
+ "loaded":"load","loading":"load","reaload":"reload",
+ "stoped":"stop","stopped":"stop","haltt":"halt","reporting":"report"
+};
+function editDistance(a,b){
+ if(Math.abs(a.length-b.length)>2)return 3;
+ const m=Array.from({length:b.length+1},(_,i)=>i);
+ for(let i=1;i<=a.length;i++){
+  let last=m[0];m[0]=i;
+  for(let j=1;j<=b.length;j++){
+   const save=m[j];
+   m[j]=Math.min(m[j]+1,m[j-1]+1,last+(a[i-1]===b[j-1]?0:1));
+   last=save;
+  }
+ }
+ return m[b.length];
+}
+function correction(word){
+ if(ACTION_SPEECH_SYNONYMS[word])return ACTION_SPEECH_SYNONYMS[word];
+ if(ACTION_LEXICON.includes(word)||word.length<5)return word;
+ const found=ACTION_LEXICON.filter(v=>v.length>=5&&editDistance(word,v)===1);
+ return found.length===1?found[0]:word;
+}
+export function normalizeCommandSlots(text){
+ // A question is information seeking. Never fuzzy-map its words to orders.
+ if(/^(?:(?:driver|delta|gunner|beta|loader|gamma|silver|radio|observer|alpha|commander)\s+)?(?:who|what|where|when|why|how|can|could|are|is|do|does|did|will|would|which|tell me)\b/.test(text))return text;
+ // Only words in a plausible action position after an actor or a connector
+ // are candidates for fuzzy repair. All other words remain literal.
+ const parts=text.split(/(\s+)/);
+ const actors=new Set(Object.keys(ACTORS));
+ const connectors=new Set(["and","then","while","after","meanwhile"]);
+ let open=true;
+ for(let i=0;i<parts.length;i++){
+  const word=parts[i];if(!/^[a-z]+$/.test(word))continue;
+  const previous=i>=2?parts[i-2]:"";
+  if(["when","once","until","if"].includes(word)){open=false;continue;}
+  if(!open&&["reports","says","loaded","locked"].includes(word))continue;
+  if(actors.has(previous)||connectors.has(previous)||actors.has(word)){if(!parts.slice(0,i).join("").match(/\b(?:when|once|until|if)\b[^;.!?]*$/))open=true;if(actors.has(word))continue;}
+  if(open&&!["us","the","to","you","please","just"].includes(word)){
+   const fixed=correction(word);
+   parts[i]=fixed;
+   // Once a command verb starts, arguments are never autocorrected.
+   if(ACTION_LEXICON.includes(fixed))open=false;
+  }
+ }
+ return parts.join("");
+}
+
 export function normalizeSpeech(input){
   return String(input??"").toLowerCase()
     .replace(/[’‘]/g,"'").replace(/[“”]/g,'"')
@@ -44,7 +108,6 @@ export function normalizeSpeech(input){
     .replace(/\b(?:uh+|um+|please|kindly)\b/g," ")
     .replace(/\b(?:go ahead and|would you|could you|can you)\b/g," ")
     .replace(/\b(\w+)(?:\s+\1\b)+/g,"$1")
-    .replace(/\b[a-z]+\b/g,word=>ASR_ACTION_CORRECTIONS[word]||word)
     .replace(/\s+/g," ").trim();
 }
 function numeric(s){
@@ -72,6 +135,31 @@ export function parseAmount(raw,kind){
   if(kind==="angle")return numeric(raw);
   return null;
 }
+
+// Directly adapted from Truth First v6.3 parser.mjs splitActorSubjects.
+// Multiple named recipients may be spoken without explicit punctuation.
+// The guard keeps subordinate subjects ("when Gunner reports locked") inside
+// the parent condition rather than inventing another instruction.
+function splitActorSubjects(chunk){
+ const mentions=[...chunk.matchAll(subjectRx)];
+ const starts=[];
+ for(const m of mentions){
+  const before=chunk.slice(0,m.index);
+  if(/\b(?:when|once|until|if)\s*$/i.test(before))continue;
+  if(/\b(?:when|once|until|if)\b[^;.!?]*$/i.test(before))continue;
+  starts.push(m.index);
+ }
+ if(starts.length<=1)return [chunk.trim()].filter(Boolean);
+ const out=[];
+ for(let i=0;i<starts.length;i++){
+  const piece=chunk.slice(starts[i],i+1<starts.length?starts[i+1]:chunk.length).replace(/^[,\s]+|[,\s]+$/g,"").trim();
+  if(piece)out.push(piece);
+ }
+ const prefix=chunk.slice(0,starts[0]).trim();
+ if(prefix&&out.length)out[0]=(prefix+" "+out[0]).trim();
+ return out;
+}
+
 function splitSections(text){
   // Preserve connectors as graph edges. "and" between two verbs stays inside
   // a concurrent packet; "then" creates an explicit dependency.
@@ -86,7 +174,7 @@ function splitSections(text){
     }
     out.push({text:part.trim(),relation});relation="CONCURRENT";
   }
-  return out;
+  return out.flatMap(section=>splitActorSubjects(section.text).map((part,i)=>({text:part,relation:i===0?section.relation:'CONCURRENT'})));
 }
 function splitActions(section){
   const matches=[...section.matchAll(ACTION_START)];
@@ -117,6 +205,24 @@ function classify(raw){
   // into movement plus turn upstream when another action is explicit.
   return found[0];
 }
+
+// Query recognition is adapted from Truth First v6.3 parseQuery. Questions
+// inspect information; they must NEVER accidentally trigger movement/fire.
+function queryTypeOf(raw){
+ const text=raw.trim().replace(/^,+\s*/,"");
+ if(!/^(?:who|what|where|when|why|how|can|could|are|is|do|does|did|will|would|which|report|status|sitrep|tell me)\b/.test(text))return null;
+ if(/\b(?:ammo|ammunition|rounds?|shells?|loaded|reload|loading|breech)\b/.test(text))return "AMMO";
+ if(/\b(?:heading|bearing|direction|azimuth|facing|pointing)\b/.test(text))return "HEADING";
+ if(/\b(?:speed|moving|movement|advancing|stopped|distance|driving)\b/.test(text))return "MOTION";
+ if(/\b(?:gun|laid|ready to fire|aim|lock|target acquired)\b/.test(text))return "GUN";
+ if(/\b(?:enemy|contact|panzer|opposition|hostile|threat)\b/.test(text))return "CONTACT";
+ if(/\b(?:see|seeing|visible|look|spot|eyes on)\b/.test(text))return "OBSERVATION";
+ if(/\b(?:options|orders|commands|can we|can you|capable)\b/.test(text))return "CAPABILITY";
+ if(/\b(?:objective|mission)\b/.test(text))return "OBJECTIVE";
+ if(/\b(?:report|status|sitrep|how are we|how's the tank)\b/.test(text))return "STATUS";
+ return "STATUS";
+}
+
 function conditionFrom(raw){
   const m=raw.match(/\b(when|once|until|if|after)\s+(.+)$/);
   if(!m)return {main:raw,condition:null,error:null};
@@ -154,7 +260,7 @@ function ammoOf(raw){
 }
 
 export function parseTransmission(input,prior={}){
- const normalized=normalizeSpeech(input),frames=[],errors=[];
+ const normalized=normalizeCommandSlots(normalizeSpeech(input)),frames=[],errors=[];
  let focusActor=prior.focusActor||null;
  if(!normalized)return {ok:false,frames,errors:[{code:"EMPTY",detail:"No transmission"}],discourse:{focusActor},normalized};
  const sections=splitSections(normalized);
@@ -172,13 +278,14 @@ export function parseTransmission(input,prior={}){
   const stageDependencies=section.relation==='AFTER'&&frames.length?[{type:'AFTER_FRAME',frame:frames.length-1}]:[];
   for(let j=0;j<atoms.length;j++){
    const raw=atoms[j].replace(/^(?:and|to|you|please)\s+/,"").replace(/\s+(?:and|then)\s*$/,"").trim();
-   const {main,condition,error}=conditionFrom(raw);
+   const queryType=queryTypeOf(raw);
+   const {main,condition,error}=queryType?{main:raw,condition:null,error:null}:conditionFrom(raw);
    if(error){errors.push({...error,clause:raw});continue;}
-   const action=classify(main);
+   const action=queryType?"REPORT":classify(main);
    if(!action){errors.push({code:"UNKNOWN_ACTION",clause:raw});continue;}
-   const actor=lead?focusActor:ROLES[action]||focusActor;
+   const actor=queryType?(lead?focusActor:"silver"):(lead?focusActor:ROLES[action]||focusActor);
    if(!actor){errors.push({code:"MISSING_ACTOR",clause:raw});continue;}
-   if(actor!==ROLES[action]&&!(action==="SPOT"&&["alpha","beta","silver"].includes(actor))){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
+   if(!queryType&&actor!==ROLES[action]&&!(action==="SPOT"&&["alpha","beta","silver"].includes(actor))){errors.push({code:"WRONG_CREW",clause:raw,actor,expected:ROLES[action]});continue;}
    const direction=directionOf(main);
    const degrees=["TURN","TRAVERSE"].includes(action)?parseAmount(main,"angle"):null;
    const distance=["ADVANCE","REVERSE"].includes(action)?parseAmount(main,"distance"):null;
@@ -202,7 +309,7 @@ export function parseTransmission(input,prior={}){
    if(condition?.mode==="UNTIL"&&!["ADVANCE","REVERSE","TURN","TRAVERSE"].includes(action)){errors.push({code:"INVALID_UNTIL",clause:raw});continue;}
    const relation=frames.length===0?"FIRST":j===0?section.relation:"CONCURRENT";
    const index=frames.length;
-   frames.push({index,kind:"ORDER",actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
+   frames.push({index,kind:queryType?"QUERY":"ORDER",queryType,actor,action,direction,degrees,distance,ammo,bearing,speedProfile,condition,relation,
     dependencies:stageDependencies.map(d=>({...d})),raw});
   }
  }

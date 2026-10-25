@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import {createSpeechPacketizer} from './speech-packetizer.js';
 import {makeGame,step,command,designate,terrainHeight,obstacles,bearing,norm,diff} from './model.js';
 import './style.css';
 const root=document.querySelector('#app');
@@ -38,20 +39,17 @@ function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end
 function issue(s){if(!s.trim())return;if(/^(restart|retry)(?: game)?[.!?]?$/i.test(s.trim())){restartGame();return;}g.message=command(g,s);renderHud();}
 const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voice-state');
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
-let recognition=null,listening=false,wantListening=false,phrase='',silenceTimer=null,restartTimer=null;
-const SILENCE_MS=3000; // Fallback for interim recognition; final speech results submit immediately.
+let recognition=null,listening=false,wantListening=false,restartTimer=null;
 function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
-function cancelSilence(){if(silenceTimer!==null){clearTimeout(silenceTimer);silenceTimer=null;}}
-function commitPhrase(){cancelSilence();const spoken=phrase.trim();phrase='';if(spoken){issue(spoken);updateVoice('Command sent: '+spoken);}}
-function holdPhrase(text){phrase=text.trim();cancelSilence();if(!phrase)return;voiceState.textContent='Heard: '+phrase+' · sending after 3 seconds of quiet';silenceTimer=setTimeout(commitPhrase,SILENCE_MS);}
+const speechPackets=createSpeechPacketizer({submit:issue,status:msg=>voiceState.textContent=msg});
 function retryListening(){if(!wantListening||listening)return;clearTimeout(restartTimer);restartTimer=setTimeout(()=>{if(!wantListening||listening)return;try{recognition.start();}catch{updateVoice('Microphone paused. Tap OFF then ON to retry.');}},300);}
 if(SpeechRecognition){
  recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
  recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
- recognition.onresult=ev=>{let assembled='';let finalText='';for(let i=ev.resultIndex;i<ev.results.length;i++){const t=ev.results[i][0]?.transcript?.trim()||'';if(!t)continue;if(ev.results[i].isFinal)finalText+=(finalText?' ':'')+t;else assembled+=(assembled?' ':'')+t;}if(finalText){phrase=finalText;commitPhrase();}else if(assembled)holdPhrase(assembled);};
- recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;cancelSilence();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
+ recognition.onresult=ev=>speechPackets.receive(ev);
+ recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
  recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
- mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){phrase='';updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);commitPhrase();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
+ mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
 }else{mic.disabled=true;updateVoice('Speech recognition unavailable in this browser. Try Chrome or keyboard fallback.');}
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));

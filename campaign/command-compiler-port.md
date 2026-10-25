@@ -37,3 +37,11 @@ Crew routing is strict: Delta drives/turns, Beta traverses/acquires/fires, Gamma
 - `pages.yml`: deploy only if prior tests pass.
 
 Do not declare the physical phone experience accepted solely from green CI. Keep scene, first-person camera and Three.js intact; 2D sprites remain the art medium.
+
+## October 24 speech hardening campaign
+
+The v6.3 parser's `splitActorSubjects` routine has been adapted directly to Shell Shock's crew roster, including an additional guard against splitting subordinate clauses such as “when gunner reports locked”. Other v6.3 concepts (intent frames, discourse state, relation/dependency graph, late-bound predicates) are domain adaptations. The entire infantry-specific v6.3 grammar is **not** claimed as a drop-in port.
+
+Speech recognition now feeds `src/speech-packetizer.js`, not individual instant command calls. Continuous Web Speech API transcripts can contain multiple final result slots plus changing interim slots. The packetizer merges these into an atomic utterance, waits approximately 420 ms after a complete final to gather adjacent final fragments, and retains a three-second thinking window for interim or incomplete speech. Switching the microphone off flushes its pending packet once. Fuzz and packetizer tests are deterministic and run in GitHub Actions; only actual Android microphone performance remains outside the automated acceptance evidence.
+
+`tests/speech-mutation-corpus.test.mjs`, `tests/parser-property-fuzz.test.mjs`, and `tests/speech-packetizer.test.mjs` add broad ASR typo mutations, multi-recipient packets, malformed multi-command atomic rejection, repeated parse determinism, delayed/segmented finals, and no duplicate submission. Unrecognized vocabulary is rejected rather than freely “interpreted” as action.
