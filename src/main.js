@@ -38,8 +38,10 @@ renderer.domElement.addEventListener('pointerup',ev=>{dragging=false;if(Math.abs
 const ui=document.querySelector('#message');
 let lastSpokenMessage='';
 let crewSpeaking=false;
+function words(t){return String(t||'').toLowerCase().replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
+function isCrewEcho(transcript){const heard=words(transcript),spoken=words(crewVoice.speakingText);if(!heard||!spoken)return false;if(/^(?:driver|delta|gunner|beta|loader|gamma|silver|commander|alpha)\b/.test(heard))return false;return heard.length>=5&&(spoken.includes(heard)||heard.includes(spoken));}
 const crewAudioButton=document.querySelector('#crew-audio');
-const crewVoice=createCrewVoice({onState:status=>{crewSpeaking=status==='speaking';if(crewSpeaking)speechPackets?.abort?.();}});
+const crewVoice=createCrewVoice({onState:status=>{crewSpeaking=status==='speaking';}});
 if(!crewVoice.available){crewAudioButton.disabled=true;crewAudioButton.textContent='Crew audio unavailable';}
 crewAudioButton.addEventListener('click',()=>{const on=crewVoice.enable(!crewVoice.enabled);crewAudioButton.setAttribute('aria-pressed',String(on));crewAudioButton.textContent=on?'🔊 Crew voices ON':'🔇 Crew voices OFF';if(on){lastSpokenMessage='';crewVoice.feedback('Silver: Radio check. Crew audio online.');}});
 function restartGame(){g=makeGame(g.seed+1);pitch=0;document.querySelector('#end-screen').hidden=true;renderHud();}
@@ -48,15 +50,15 @@ const mic=document.querySelector('#mic'),voiceState=document.querySelector('#voi
 const SpeechRecognition=window.SpeechRecognition||window.webkitSpeechRecognition;
 let recognition=null,listening=false,wantListening=false,restartTimer=null;
 function updateVoice(message){mic.setAttribute('aria-pressed',String(wantListening));mic.textContent=wantListening?'🛑 Microphone ON · tap to stop':'🎙️ Microphone OFF · tap to talk';voiceState.textContent=message;}
-const speechPackets=createSpeechPacketizer({submit:issue,status:msg=>voiceState.textContent=msg});
+const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.resume();},status:msg=>voiceState.textContent=msg});
 function retryListening(){if(!wantListening||listening)return;clearTimeout(restartTimer);restartTimer=setTimeout(()=>{if(!wantListening||listening)return;try{recognition.start();}catch{updateVoice('Microphone paused. Tap OFF then ON to retry.');}},300);}
 if(SpeechRecognition){
  recognition=new SpeechRecognition();recognition.lang='en-US';recognition.continuous=true;recognition.interimResults=true;
  recognition.onstart=()=>{listening=true;updateVoice('Listening continuously · 3 seconds of quiet submits');};
- recognition.onresult=ev=>{if(!crewSpeaking)speechPackets.receive(ev);};
+ recognition.onresult=ev=>{const text=Array.from(ev.results).slice(ev.resultIndex||0).map(r=>r[0]?.transcript||'').join(' ').trim();if(crewSpeaking&&isCrewEcho(text))return;if(text&&crewSpeaking)crewVoice.interrupt();speechPackets.receive(ev);};
  recognition.onerror=ev=>{if(['not-allowed','service-not-allowed','audio-capture'].includes(ev.error)){wantListening=false;speechPackets.abort();clearTimeout(restartTimer);}updateVoice('Microphone: '+ev.error+'. Check browser permission if needed.');};
  recognition.onend=()=>{listening=false; if(wantListening)retryListening();else updateVoice('Microphone OFF · tap to talk');};
- mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
+ mic.addEventListener('click',()=>{wantListening=!wantListening;if(wantListening){speechPackets.abort();updateVoice('Starting microphone…');retryListening();}else{clearTimeout(restartTimer);speechPackets.flush();crewVoice.resume();updateVoice('Microphone OFF · tap to talk');if(listening)recognition.stop();}});
 }else{mic.disabled=true;updateVoice('Speech recognition unavailable in this browser. Try Chrome or keyboard fallback.');}
 document.querySelector('#form').addEventListener('submit',ev=>{ev.preventDefault();const input=document.querySelector('#order');issue(input.value);input.value='';});
 document.querySelectorAll('[data-order]').forEach(b=>b.addEventListener('click',()=>issue(b.dataset.order)));
