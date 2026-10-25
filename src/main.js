@@ -102,7 +102,7 @@ const speechPackets=createSpeechPacketizer({submit:text=>{issue(text);crewVoice.
 function commanderBargeIn(t){
  const spoken=words(t);
  if(isCrewEcho(t))return false;
- if(!/^(?:driver|delta|gunner|beta|loader|gamma|silver|fire|halt|stop|advance|reverse|turn|load)\\b/.test(spoken))return false;
+ if(!/^(?:driver|delta|gunner|beta|loader|gamma|silver|fire|halt|stop|advance|reverse|turn|load)\b/.test(spoken))return false;
  return parseTransmission(t).ok;
 }
 let partial='';
