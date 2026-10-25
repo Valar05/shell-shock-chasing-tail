@@ -245,13 +245,21 @@ export function command(g,input){
 // Each station can independently observe a contact within its actual field of
 // view, provided terrain does not occlude it. One first-contact report per
 // station prevents constant radio spam and preserves distinctive perspectives.
+export function contactObstruction(g,a,b){
+ for(let i=1;i<60;i++){
+  const t=i/60,x=a.x+(b.x-a.x)*t,z=a.z+(b.z-a.z)*t;
+  const id=obstacles.findIndex((o,id)=>intersectRect(x,z,o)&&!insideBreach(x,z,id,g.breaches));
+  if(id>=0)return obstacles[id].type==='house'?'farmhouse':'hedgerow';
+ }
+ return null;
+}
 export function observeCrewContacts(g){
  const p=g.player,e=g.enemy;
  g.contactReported ||= {delta:false,beta:false};
  g.crewEvents ||= [];
  if(e.hp<=0)return;
  const target=bearing(p,e),range=Math.round(distance(p,e));
- const obstructed=blocked(p,e,[],g.breaches);
+ const occluder=contactObstruction(g,p,e),obstructed=Boolean(occluder);
  const emit=(id,kind,message)=>{
   g.crewEvents.push({speaker:id,id:id+'.'+kind,message,bearing:Math.round(target),range,priority:4});
   if(g.crewEvents.length>20)g.crewEvents.shift();
@@ -277,13 +285,14 @@ export function observeCrewContacts(g){
    const m=g.threatMemory;
    m.observers[o.id]={state:'lost',lastSeen:m.observers[o.id].lastSeen};
    m.state='last-known';
-   const location=obstructed?'behind terrain':'outside my sight';
+   const location=obstructed?'behind the '+occluder:'outside my sight';
    const prefix=o.id==='beta'?'Beta: Lost visual on Panzer ':'Delta: Lost sight of armor ';
    emit(o.id,'lost',prefix+location+'. Last known bearing '+m.bearing+' degrees. Watching for it.');
   }
  }
  const m=g.threatMemory;
- if(m?.observers.beta?.state==='lost'&&!p.aim){
+ if(m?.observers.beta?.state==='lost'){
+  if(p.aim==='enemy'){p.aim=null;p.aimTime=0;}
   const phase=Math.sin((g.elapsed-m.observers.beta.lastSeen)*.55)*18;
   const desired=norm(bearing(p,m)+phase);
   p.turret=norm(p.turret+clamp(diff(desired,p.turret),-.17,.17));
@@ -309,7 +318,7 @@ export function step(g,dt){
    }
   }
  }
- if(p.aim==='enemy'&&e.hp>0){const target=bearing(p,e);p.turret=norm(p.turret+clamp(diff(target,p.turret),-20*dt,20*dt));p.aimTime=Math.abs(diff(target,p.turret))<5&&!blocked(p,e,[],g.breaches)?p.aimTime+dt:0;}
+ if(p.aim==='enemy'&&e.hp>0&&!blocked(p,e,[],g.breaches)){const target=bearing(p,e);p.turret=norm(p.turret+clamp(diff(target,p.turret),-20*dt,20*dt));p.aimTime=Math.abs(diff(target,p.turret))<5&&!blocked(p,e,[],g.breaches)?p.aimTime+dt:0;}
  if(p.fireRequested&&p.aimTime>1.8&&g.loaded&&e.hp>0){p.fireRequested=false;p.shotCount++;const clear=!blocked(p,e,[],g.breaches);const angle=Math.abs(diff(bearing(e,p),e.hull));const dmg=g.loaded==='AP'?(angle>55?68:38):g.loaded==='HE'?11:0;
   g.message=clear?(dmg?'Beta: HIT! '+(angle>55?'Side armor!':'Frontal armor!'):'Beta: Smoke away!'):'Beta: Shot blocked by terrain!';
   if(clear)e.hp-=dmg;g.loaded=null;g.loading=3.8;p.aimTime=0;e.alert=true;
