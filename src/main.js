@@ -68,6 +68,10 @@ function renderCompass(){const width=document.querySelector('#compass').clientWi
 function renderHud(){renderCompass();document.querySelector('#bearings').textContent='HULL '+Math.round(g.player.hull).toString().padStart(3,'0')+'°  |  VIEW '+Math.round(g.view).toString().padStart(3,'0')+'°  |  GUN '+Math.round(g.player.turret).toString().padStart(3,'0')+'°';
  document.querySelector('#status').textContent='ARMOR '+Math.max(0,Math.round(g.player.hp))+'% · GUN '+(g.loaded||'EMPTY')+' · '+(g.player.aimTime>1.8?'LAID':'ACQUIRING')+' · '+(g.enemySeen?'PANZER CONTACT':'NO CONTACT')+(g.finished?' · '+g.finished.toUpperCase():'');
  ui.textContent=g.message;
- if(g.message!==lastSpokenMessage){lastSpokenMessage=g.message;crewVoice.feedback(g.message);}
+ const reported=g.crewEvents?.splice(0)||[];
+ for(const event of reported){crewVoice.feedback(event.message);}
+ if(g.message!==lastSpokenMessage){lastSpokenMessage=g.message;
+   if(!reported.some(event=>event.message===g.message))crewVoice.feedback(g.message);
+ }
  const end=document.querySelector('#end-screen');if(g.finished){end.hidden=false;document.querySelector('#end-title').textContent=g.finished==='Victory'?'Victory · Enemy destroyed':'Defeat · Tank knocked out';document.querySelector('#end-caption').textContent=g.message;}else end.hidden=true;}
 let last=performance.now(),hud=0,simulationDebt=0;function frame(now){requestAnimationFrame(frame);const dt=Math.min(Math.max((now-last)/1000,0),.25);last=now;simulationDebt+=dt;let steps=0;while(simulationDebt>=.02&&steps<13){step(g,.02);simulationDebt-=.02;steps++;}drawWorld();hud+=dt;if(hud>.12){renderHud();hud=0;}}requestAnimationFrame(frame);
