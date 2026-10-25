@@ -91,3 +91,31 @@ test('run over that tree resolves through commander view and actually removes wo
  assert.ok(g.crushedTrees.includes(t.id),'tree should be run over and removed');
  assert.equal(g.navigation,null);
 });
+
+test('tree target 30 degrees to left is measured relative to the viewing bearing',async()=>{
+ const {trees}=await import('../src/model.js');
+ const {parseTransmission}=await import('../src/command-parser.js');
+ const frame=parseTransmission('run over the tree 30 degrees to the left').frames[0];
+ assert.equal(frame.action,'CRUSH_TREE');
+ assert.equal(frame.targetOffset,30);
+ assert.equal(frame.direction,'left');
+ const g=makeGame();g.player.x=-4;g.player.z=1;
+ const target=trees.find(t=>Math.hypot(t.x+4,t.z-1)>15&&Math.hypot(t.x+4,t.z-1)<80);
+ assert.ok(target);
+ g.view=norm(bearing(g.player,target)+30);
+ const response=command(g,'run over the tree 30 degrees to the left');
+ assert.match(response,/30 degrees left/i);
+ assert.equal(g.navigation.treeId,target.id);
+ const other=makeGame();other.player.x=-4;other.player.z=1;other.view=g.view;
+ const noAngle=command(other,'run over the tree');
+ assert.ok(!other.navigation||other.navigation.treeId!==target.id||!/Tree identified/.test(noAngle),
+ 'unqualified sightline targeting should not secretly apply a 30 degree offset');
+});
+test('relative right tree bearing is preserved and out-of-range angles are rejected',async()=>{
+ const {parseTransmission}=await import('../src/command-parser.js');
+ const parsed=parseTransmission('driver run over that tree thirty degrees to the right');
+ assert.equal(parsed.ok,true,JSON.stringify(parsed.errors));
+ assert.equal(parsed.frames[0].targetOffset,30);
+ assert.equal(parsed.frames[0].direction,'right');
+ assert.equal(parseTransmission('run over the tree 200 degrees left').ok,false);
+});
