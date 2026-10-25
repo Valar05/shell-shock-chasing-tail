@@ -33,7 +33,7 @@ test('browser synth adapter can be replaced with recorded clips',()=>{
  engine.enable(false);assert.ok(cancels>0);
 });
 
-test('commander interruption cancels active subordinate and resumes remaining words after reply',()=>{
+test('commander interruption re-evaluates full crew report after reply',()=>{
  const utterances=[],cancelled=[];
  class U{constructor(text){this.text=text;}}
  const synth={speaking:false,pending:false,getVoices:()=>[{lang:'en-US'}],addEventListener(){},
@@ -49,7 +49,7 @@ test('commander interruption cancels active subordinate and resumes remaining wo
  voice.resume();
  assert.equal(utterances[1].text,'Turning left, sir.');
  utterances[1].onend();
- assert.ok(utterances[2].text.includes('behind the farmhouse'));
+ assert.equal(utterances[2].text,'Enemy tank moving behind the farmhouse at two o clock.');
  assert.equal(voice.interrupted,false);
 });
 test('cancelled synthesis callbacks cannot complete replacement audio',()=>{
@@ -77,4 +77,14 @@ test('stale interrupted threat is dropped after target destroyed',()=>{
  assert.match(utterances[1].text,/destroyed/);
  utterances[1].onend();
  assert.equal(utterances.length,2,'obsolete contact must not resume');
+});
+
+test('interrupted report is replaced by fresh tactical state',()=>{
+ let current='contact';const heard=[];
+ class U{constructor(text){this.text=text;}}
+ const synthesis={speaking:false,pending:false,getVoices:()=>[],addEventListener(){},cancel(){},speak:u=>heard.push(u)};
+ const voice=createCrewVoice({synthesis,Utterance:U,resolveInterrupted:old=>current==='destroyed'?null:{...old,text:'Lost sight of armor behind the farmhouse.'}});
+ voice.enable(true);voice.say({id:'delta.contact',speaker:'delta',text:'Enemy ahead!',priority:4});voice.interrupt();
+ voice.resume();assert.equal(heard[1].text,'Lost sight of armor behind the farmhouse.');
+ voice.interrupt();current='destroyed';voice.resume();assert.equal(heard.length,2);
 });
