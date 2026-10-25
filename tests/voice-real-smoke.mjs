@@ -43,7 +43,7 @@ try{
  if(remoteUrl){
   try{await page.waitForFunction(()=>window.crossOriginIsolated===true,null,{timeout:30000});}
   catch(err){
-   const info=await page.evaluate(()=>({url:location.href,isolation:crossOriginIsolated,secure:isSecureContext,
+   const info=await page.evaluate(async()=>({url:location.href,isolation:crossOriginIsolated,secure:isSecureContext,
     controller:!!navigator.serviceWorker?.controller,registration:!!(await navigator.serviceWorker?.getRegistration()),
     html:document.body?.textContent?.slice(0,200),scripts:[...document.scripts].map(s=>s.src)}));
    throw Error('Hosted isolation failed '+JSON.stringify({info,network:network.slice(-10),errors:errors.slice(-10)})+' '+err.message);
