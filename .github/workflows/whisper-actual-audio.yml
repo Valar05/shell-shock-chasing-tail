@@ -1,0 +1,20 @@
+name: Whisper actual WAV benchmark
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  actual-wav:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: sudo apt-get update -qq && sudo apt-get install -y espeak-ng
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - run: npm test
+      - run: npm run build
+      - run: node tests/whisper-real-audio.mjs
