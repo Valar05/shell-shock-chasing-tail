@@ -1,43 +1,61 @@
-// Engine-independent progressive order gate. No model/runtime coupling.
-// A stable complete movement clause may commit before an utterance is final.
-// Firing never commits from interim ASR hypotheses.
-const numberWords={thirty:30,forty:40,fifty:50,sixty:60,ninety:90};
-function numberOf(text){const m=text.match(/\b(\d{1,3}|thirty|forty|fifty|sixty|ninety)\s*(?:degrees?|deg|°)\b/i);if(!m)return null;return numberWords[m[1].toLowerCase()]??Number(m[1]);}
-function segment(text){return text.toLowerCase().replace(/[.,!?]/g," ").replace(/\s+/g," ").trim().split(/\s+and\s+(?=(?:run over|crush|turn|driver|delta|beta|gunner|fire|halt)\b)|\s+then\s+(?=(?:run over|crush|turn|driver|delta|beta|gunner|fire|halt)\b)/);}
-export function interpretClause(raw,{final=false}={}){
- const s=raw.trim().toLowerCase();
+// Progressive ASR hypotheses -> bounded, idempotent commands.
+// This module has no Android, ONNX, or game-engine dependency.
+const NUMBERS={thirty:30,forty:40,fifty:50,sixty:60,ninety:90};
+const TURN=/\b(?:turn|steer|rotate|pivot)\b/;
+const NEGATED_FIRE=/\b(?:do not|don't|never|hold|cease|stop)\s+(?:fire|firing)\b/;
+const FIRE=/\b(?:fire|shoot)\b/;
+const HALT=/\b(?:halt|stop)\b|\b(?:driver|delta)\s+holt\b/;
+function splitClauses(input){
+ return input.toLowerCase().replace(/[.,!?]/g," ").replace(/\s+/g," ").trim()
+ .split(/\s+(?:and|then)\s+(?=(?:run over|crush|turn|driver|delta|beta|gunner|fire|halt)\b)/);
+}
+export function interpretClause(text,{final=false}={}){
+ const s=text.trim().toLowerCase();
  if(!s)return {status:"incomplete",reason:"empty"};
- if(/\b(?:do not|don't|never|hold|cease|stop)\s+(?:fire|firing)\b/.test(s))return {status:final?"commit":"prepare",kind:"HOLD_FIRE",safe:true};
- if(/\b(?:fire|shoot)\b/.test(s))return {status:final?"clarify":"prepare",kind:"FIRE",reason:"explicit_fire_authorization_requires_final_validation"};
- if(/\b(?:halt|stop)\b/.test(s)||/\b(?:driver|delta)\s+holt\b/.test(s))return {status:final?"commit":"prepare",kind:"HALT",safe:true};
- if(/\b(?:turn|steer|rotate|pivot)\b/.test(s)){
-  const direction=/\bleft\b/.test(s)?"left":/\bright\b/.test(s)?"right":null;
-  const angle=numberOf(s);
+ if(NEGATED_FIRE.test(s))return {status:final?"commit":"prepare",kind:"HOLD_FIRE"};
+ if(FIRE.test(s))return {status:final?"clarify":"prepare",kind:"FIRE",reason:"fire_needs_explicit_validated_authorization"};
+ if(HALT.test(s))return {status:final?"commit":"prepare",kind:"HALT"};
+ if(TURN.test(s)){
+  const left=/\bleft\b/.test(s),right=/\bright\b/.test(s);
+  if(left&&right)return {status:"reject",kind:"TURN",reason:"conflicting_directions"};
+  const direction=left?"left":right?"right":null;
+  const tokens=s.match(/\b(\d{1,3}|thirty|forty|fifty|sixty|ninety)\s*(?:degrees?|deg)\b/);
+  const angle=tokens?(NUMBERS[tokens[1]]??Number(tokens[1])):null;
   if(!direction||angle===null)return {status:final?"clarify":"prepare",kind:"TURN",reason:!direction?"direction_missing":"angle_missing"};
   if(!Number.isInteger(angle)||angle<1||angle>180)return {status:"reject",kind:"TURN",reason:"invalid_angle"};
-  return {status:"commit",kind:"TURN",direction,angle,safe:true};
+  return {status:"commit",kind:"TURN",direction,angle};
  }
  if(/\b(?:run over|crush)\b/.test(s)){
-   if(!/\btrees?\b/.test(s))return {status:final?"clarify":"prepare",kind:"CRUSH_TREE",reason:"target_missing"};
-   return {status:final?"commit":"prepare",kind:"CRUSH_TREE",target:"tree",safe:true};
+  if(!/\btrees?\b/.test(s))return {status:final?"clarify":"prepare",kind:"CRUSH_TREE",reason:"target_missing"};
+  return {status:final?"commit":"prepare",kind:"CRUSH_TREE",target:"tree"};
  }
  return {status:final?"clarify":"prepare",reason:"unrecognized_intent"};
 }
-export class ProgressiveInterpreter {
- constructor(){this.turnId=null;this.done=new Set();}
+function signature(c){return JSON.stringify([c.kind,c.direction??null,c.angle??null,c.target??null]);}
+export class ProgressiveInterpreter{
+ constructor({stablePartials=2}={}){this.stablePartials=stablePartials;this.sessions=new Map();}
  accept({utteranceId,transcript,isFinal=false}){
   if(!utteranceId||typeof transcript!=="string")throw Error("utteranceId and transcript required");
-  const fragments=segment(transcript);const actions=[];
-  for(let i=0;i<fragments.length;i++){
-   const fragment=fragments[i];const analysis=interpretClause(fragment,{final:isFinal});
-   // A trailing clause may still be extended. Never commit an interim fire or target order.
-   if(analysis.status!=="commit")continue;
-   const key=utteranceId+":"+i;
-   if(this.done.has(key))continue;
-   this.done.add(key);
-   actions.push({id:key,kind:analysis.kind,direction:analysis.direction??null,angle:analysis.angle??null,target:analysis.target??null});
+  if(!this.sessions.has(utteranceId))this.sessions.set(utteranceId,{committed:new Map(),prior:new Map()});
+  const state=this.sessions.get(utteranceId),parts=splitClauses(transcript),actions=[],clauses=[];
+  for(let i=0;i<parts.length;i++){
+   const c=interpretClause(parts[i],{final:isFinal});clauses.push(c);
+   const sig=signature(c),previous=state.prior.get(i);
+   const count=previous?.signature===sig?previous.count+1:1;
+   state.prior.set(i,{signature:sig,count});
+   if(c.status!=="commit")continue;
+   // Interim hypotheses must repeat before movement is permitted.
+   if(!isFinal&&count<this.stablePartials)continue;
+   const existing=state.committed.get(i);
+   if(existing){
+    // Final ASR correction never causes another action at the same clause index.
+    if(existing!==sig)clauses[i]={...c,status:"conflict",reason:"already_committed_different_hypothesis"};
+    continue;
+   }
+   state.committed.set(i,sig);
+   actions.push({id:utteranceId+":"+i,kind:c.kind,direction:c.direction??null,angle:c.angle??null,target:c.target??null});
   }
-  return {actions,clauses:fragments.map(f=>interpretClause(f,{final:isFinal}))};
+  return {actions,clauses};
  }
- reset(utteranceId){this.done.forEach(key=>{if(key.startsWith(utteranceId+":"))this.done.delete(key)})}
+ reset(utteranceId){this.sessions.delete(utteranceId)}
 }
