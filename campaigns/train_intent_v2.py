@@ -24,7 +24,7 @@ HOLDOUT={
 CRITICAL=[("beta do not fire","HOLD_FIRE"),("beta fire drill","OTHER"),("turn right for debris","TURN"),("driver hall","OTHER"),("there is a fire in the barn","OTHER")]
 LABELS=tuple(sorted(TRAIN))
 def features(s):
- s=re.sub(r"[^a-z0-9 ]"," ",s.lower());s=re.sub(r"\\s+"," ",s).strip();d=collections.Counter()
+ s=re.sub(r"[^a-z0-9 ]"," ",s.lower());s=re.sub(r"\s+"," ",s).strip();d=collections.Counter()
  for w in s.split():d["w:"+w]+=2
  for n in (3,4):
   t="  "+s+"  "
@@ -58,7 +58,7 @@ def predict(m,s):
  f=features(s);return max(LABELS,key=lambda k:sum(m["weights"][k].get(j,0)*v for j,v in f.items()))
 def receipt(stage,**kwargs):
  OUT.mkdir(parents=True,exist_ok=True);r={"stage":stage,"utc":time.strftime("%Y-%m-%dT%H:%M:%SZ",time.gmtime()),**kwargs}
- (OUT/"receipt.json").write_text(json.dumps(r,indent=2)+"\\n");print(json.dumps(r,indent=2))
+ (OUT/"receipt.json").write_text(json.dumps(r,indent=2)+"\n");print(json.dumps(r,indent=2))
 def main():
  if len(sys.argv)!=2 or sys.argv[1] not in ("doctor","train","status"):raise SystemExit("Usage: train_intent_v2.py doctor|train|status")
  mode=sys.argv[1]
