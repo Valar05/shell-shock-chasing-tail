@@ -11,7 +11,7 @@ export function interpretClause(raw,{final=false}={}){
  if(/\b(?:fire|shoot)\b/.test(s))return {status:final?"clarify":"prepare",kind:"FIRE",reason:"explicit_fire_authorization_requires_final_validation"};
  if(/\b(?:halt|stop)\b/.test(s)||/\b(?:driver|delta)\s+holt\b/.test(s))return {status:final?"commit":"prepare",kind:"HALT",safe:true};
  if(/\b(?:turn|steer|rotate|pivot)\b/.test(s)){
-  const direction=/\\bleft\\b/.test(s)?"left":/\\bright\\b/.test(s)?"right":null;
+  const direction=/\bleft\b/.test(s)?"left":/\bright\b/.test(s)?"right":null;
   const angle=numberOf(s);
   if(!direction||angle===null)return {status:final?"clarify":"prepare",kind:"TURN",reason:!direction?"direction_missing":"angle_missing"};
   if(!Number.isInteger(angle)||angle<1||angle>180)return {status:"reject",kind:"TURN",reason:"invalid_angle"};
