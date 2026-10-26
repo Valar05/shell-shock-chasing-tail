@@ -1,0 +1,102 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Shell Shock Voice Corpus Lab</title>
+<style>
+:root{color-scheme:dark}body{font:16px system-ui,sans-serif;max-width:740px;margin:auto;padding:20px;background:#121922;color:#eef3fa}
+h1{font-size:1.5rem}button,textarea,input{font:inherit}button{background:#334965;color:white;border:1px solid #6980a0;border-radius:9px;padding:12px;margin:5px 5px 5px 0}
+button:disabled{opacity:.45}button:focus-visible,textarea:focus-visible{outline:2px solid #70c1ff}
+fieldset{border:1px solid #52617c;border-radius:12px;margin:16px 0;padding:12px}
+label{display:block;margin:12px 0 4px}textarea{box-sizing:border-box;width:100%;min-height:70px;background:#202b3b;color:white;border-radius:8px;padding:10px}
+#prompt{font-size:1.3rem;font-weight:650}#status{min-height:2.5em;color:#afcfeb}small{color:#b2c0d5}li{padding:6px 0}a{color:#80c7ff}
+</style></head><body>
+<h1>Shell Shock · Voice Corpus Lab</h1>
+<p>Prompts and spoken audio are saved in this browser's local storage. Only text is copied to the clipboard. No uploads.</p>
+<fieldset><legend>Recording</legend>
+<p id="position"></p><p id="prompt"></p>
+<label for="spoken">What I actually said (correct when different from prompt)</label><textarea id="spoken"></textarea>
+<label for="recognized">Recognizer heard (editable only to annotate, raw result retained separately)</label><textarea id="recognized"></textarea>
+<button id="record">Record</button><button id="stop" disabled>Stop and save</button><button id="skip">Next prompt</button>
+<p id="status" role="status">Ready</p>
+<small>Browser speech recognition may be unavailable, and recording audio alongside recognition may vary by device. Audio is saved independently even if recognition fails.</small>
+</fieldset>
+<fieldset><legend>Local corpus</legend>
+<p id="count">Loading...</p>
+<button id="copy">Copy text batch</button><button id="download-json">Save text JSON</button><button id="audio-export">Download all recordings</button>
+<button id="clear">Erase local corpus</button><ul id="saved"></ul>
+<small>Local IndexedDB can be cleared by browser storage cleanup. Download recordings for durable retention before clearing browser data or reinstalling.</small>
+</fieldset>
+<script type="module">
+const prompts=[
+'Turn thirty degrees left and run over that tree.',
+'Turn thirty degrees right and run over that tree.',
+'Driver, halt.',
+'Turn forty degrees left.',
+'Beta, do not fire.',
+'Beta, fire on the machine gun.',
+'Driver, hold position.',
+'No, do not turn left. Turn right thirty degrees.',
+'Gamma, reload armor piercing.',
+'Beta, cease fire.',
+'Advance to the farmhouse.',
+'Driver, reverse ten meters.',
+'Turn right forty degrees, then halt.',
+'Beta, track the enemy tank.',
+'Run over that tree.',
+'Driver, stop!',
+];
+const el=id=>document.getElementById(id);let index=0,stream=null,recorder=null,chunks=[],asr=null,raw=[],started=0,db,working=false;
+function dbOpen(){return new Promise((resolve,reject)=>{const r=indexedDB.open('shellshock-corpus-v1',1);r.onupgradeneeded=()=>r.result.createObjectStore('samples',{keyPath:'id'});r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function tx(mode='readonly'){return db.transaction('samples',mode).objectStore('samples')}
+function all(){return new Promise((resolve,reject)=>{const r=tx().getAll();r.onsuccess=()=>resolve(r.result);r.onerror=()=>reject(r.error)})}
+function put(data){return new Promise((resolve,reject)=>{const t=db.transaction('samples','readwrite');t.objectStore('samples').put(data);t.oncomplete=resolve;t.onerror=()=>reject(t.error)})}
+function status(s){el('status').textContent=s}
+function showPrompt(){el('position').textContent='Prompt '+(index+1)+' / '+prompts.length;el('prompt').textContent=prompts[index];el('spoken').value=prompts[index];el('recognized').value=''}
+async function refresh(){
+const a=await all();a.sort((x,y)=>x.time-y.time);el('count').textContent=a.length+' recordings saved locally';
+el('saved').replaceChildren();for(const item of a){const li=document.createElement('li');li.textContent=item.prompt+' · '+new Date(item.time).toLocaleString()+' ';
+const b=document.createElement('button');b.textContent='Download audio';b.onclick=()=>saveBlob(item.audio,item.id+'.'+(item.audio.type.includes('mp4')?'mp4':'webm'));li.append(b);el('saved').append(li)}
+}
+function saveBlob(blob,name){const u=URL.createObjectURL(blob),a=document.createElement('a');a.href=u;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(u),3000)}
+async function record(){
+if(working)return;
+try{
+stream=await navigator.mediaDevices.getUserMedia({audio:{echoCancellation:true,noiseSuppression:true,autoGainControl:true}});
+chunks=[];raw=[];started=performance.now();
+const mime=['audio/webm;codecs=opus','audio/mp4','audio/webm'].find(t=>MediaRecorder.isTypeSupported(t));
+recorder=new MediaRecorder(stream,mime?{mimeType:mime}:undefined);
+recorder.ondataavailable=e=>{if(e.data.size)chunks.push(e.data)};
+recorder.onerror=e=>status('Recording error: '+(e.error?.message||'unknown'));
+recorder.start(250);working=true;el('record').disabled=true;el('stop').disabled=false;el('skip').disabled=true;
+const API=window.SpeechRecognition||window.webkitSpeechRecognition;
+if(API){try{
+asr=new API();asr.lang='en-US';asr.interimResults=true;asr.continuous=true;
+asr.onresult=e=>{for(let k=e.resultIndex;k<e.results.length;k++){const v=e.results[k];raw.push({ms:Math.round(performance.now()-started),final:v.isFinal,text:v[0]?.transcript||''})}
+const finals=raw.filter(v=>v.final).map(v=>v.text);const interim=raw.filter(v=>!v.final).slice(-1).map(v=>v.text);
+el('recognized').value=[...finals,...interim].join(' ').trim()};
+asr.onerror=e=>status('Audio recording active; speech recognition: '+e.error);
+asr.start();
+}catch(e){status('Audio recording active; recognizer unavailable: '+e.message)}}
+else status('Audio recording active; no browser speech recognition available');
+if(!el('status').textContent.includes('Audio recording active'))status('Recording audio and recognition...');
+}catch(e){status('Microphone permission/error: '+e.message);stream?.getTracks().forEach(t=>t.stop())}
+}
+async function stop(){
+if(!working)return;el('stop').disabled=true;status('Saving local recording...');
+try{
+const done=new Promise((resolve,reject)=>{recorder.onstop=resolve;recorder.onerror=e=>reject(e.error||Error('Recorder error'))});
+recorder.stop();try{asr?.stop()}catch{} await done;stream?.getTracks().forEach(t=>t.stop());
+const audio=new Blob(chunks,{type:recorder.mimeType||'audio/webm'});if(!audio.size)throw Error('Empty audio file');
+const item={id:crypto.randomUUID(),time:Date.now(),prompt:prompts[index],spoken:el('spoken').value.trim(),recognized:el('recognized').value.trim(),
+hypotheses:raw,engine:'browser-native',userAgent:navigator.userAgent,audio};
+await put(item);status('Saved '+Math.round(audio.size/1024)+' KB audio and transcript locally');await refresh();index=(index+1)%prompts.length;showPrompt();
+}catch(e){status('SAVE FAILED: '+e.message+'; do not clear this page yet')}
+finally{working=false;el('record').disabled=false;el('skip').disabled=false}
+}
+function textOnly(a){return {schema:'shellshock.corpus.v1',audio_retained_locally:true,records:a.map(({audio,...rest})=>({...rest,audio_bytes:audio.size,audio_type:audio.type}))}}
+el('record').onclick=record;el('stop').onclick=stop;el('skip').onclick=()=>{if(!working){index=(index+1)%prompts.length;showPrompt()}};
+el('copy').onclick=async()=>{try{await navigator.clipboard.writeText(JSON.stringify(textOnly(await all()),null,2));status('Copied text metadata; audio remains local')}catch(e){status('Clipboard unavailable: '+e.message)}};
+el('download-json').onclick=async()=>saveBlob(new Blob([JSON.stringify(textOnly(await all()),null,2)],{type:'application/json'}),'shellshock-voice-corpus.json');
+el('audio-export').onclick=async()=>{const a=await all();for(const x of a)saveBlob(x.audio,x.id+'.'+(x.audio.type.includes('mp4')?'mp4':'webm'));status('Requested '+a.length+' downloads; your browser may ask to allow multiple downloads')};
+el('clear').onclick=async()=>{if(!confirm('Permanently erase ALL local recordings in this browser?'))return;await new Promise((resolve,reject)=>{const t=db.transaction('samples','readwrite');t.objectStore('samples').clear();t.oncomplete=resolve;t.onerror=()=>reject(t.error)});refresh();status('Local recordings erased')};
+try{db=await dbOpen();showPrompt();await refresh()}catch(e){status('Local storage unavailable: '+e.message);el('record').disabled=true}
+</script></body></html>
