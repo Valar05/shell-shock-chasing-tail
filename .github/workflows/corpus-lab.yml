@@ -1,0 +1,22 @@
+name: Corpus Lab browser recording acceptance
+on:
+  pull_request:
+    paths:
+      - 'public/voice-corpus-lab.html'
+      - 'tests/corpus-browser-smoke.mjs'
+      - '.github/workflows/corpus-lab.yml'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capture-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: {node-version: '22'}
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Verify nonempty audio persisted across reload and text export
+        run: node tests/corpus-browser-smoke.mjs
