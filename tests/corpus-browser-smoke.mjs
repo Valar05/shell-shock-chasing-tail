@@ -23,8 +23,9 @@ try{
  if(persisted.length!==1||persisted[0].bytes===0)throw Error('Audio was not actually persisted: '+JSON.stringify(persisted));
  await page.reload();
  await page.getByText('1 recordings saved locally').waitFor();
+ const downloadPromise=page.waitForEvent('download',{timeout:10000});
  await page.locator('#download-json').click();
- const dl=await page.waitForEvent('download',{timeout:10000}).catch(()=>null);
+ const dl=await downloadPromise;
  if(!dl)throw Error('JSON download not triggered');
  const text=await (await import('node:fs/promises')).readFile(await dl.path(),'utf8');
  const obj=JSON.parse(text);
