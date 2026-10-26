@@ -1,0 +1,17 @@
+{
+  "campaign": "shellshock-human-voice-fixtures-20261025",
+  "stage": "import_verified",
+  "source_sha": "d4d2627a3a6ff69ecff0dd906ec1f0fcbc35e4e5",
+  "zip_sha256": "571c9a1195e0296715654f1f3a1a19785a0e52ab59cbb3e1f1d7ded6146090c1",
+  "files": {
+    "benchmark.py": "feb865239fbc82df576b5285800a7252b5264ca9599d2c4c571717f8ca76d3ff",
+    "fixtures\\beta_do_not_fire.wav": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+    "fixtures\\driver_halt.wav": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+    "fixtures\\turn30_right_tree.wav": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+    "fixtures\\turn40_left.wav": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+    "manifest.json": "bfff3b12089f8f29ab65883dc5c79408af7bee45591f3018c95832a2c7205b91",
+    "README.md": "5e730067997be4e454cea04929eb37adc693fdf19c5dfa9407af5a898a2b0942",
+    "score.py": "3225c08ff55079e88de66afa67713094008ae1324a106672502a18443e924f6b"
+  },
+  "timestamp_utc": "2026-10-26T01:35:39Z"
+}

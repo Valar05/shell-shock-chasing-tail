@@ -1,0 +1,35 @@
+{
+  "schema": "shellshock.human-asr-fixtures.v1",
+  "source": "user-provided recorded human voice",
+  "license": "Private user-contributed recordings, do not redistribute",
+  "cases": [
+    {
+      "id": "turn30_right_tree",
+      "file": "fixtures/turn30_right_tree.wav",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "duration_s": 4.693
+    },
+    {
+      "id": "driver_halt",
+      "file": "fixtures/driver_halt.wav",
+      "expected": "Driver halt.",
+      "sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "duration_s": 2.133
+    },
+    {
+      "id": "turn40_left",
+      "file": "fixtures/turn40_left.wav",
+      "expected": "Turn forty degrees left.",
+      "sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "duration_s": 3.115
+    },
+    {
+      "id": "beta_do_not_fire",
+      "file": "fixtures/beta_do_not_fire.wav",
+      "expected": "Beta do not fire.",
+      "sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "duration_s": 2.56
+    }
+  ]
+}
