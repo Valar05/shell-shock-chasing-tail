@@ -1,0 +1,43 @@
+C:\Users\dclar\AppData\Local\RitsuCampaigns\shellshock-human-asr-20261025\repo\research\human-asr-benchmark\results\zipformer.json
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE' | decode_ms=168
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE' | decode_ms=164
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE' | decode_ms=174
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE' | decode_ms=166
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE' | decode_ms=181
+driver_halt: slot_pass=True | expected='Driver halt.' | heard='ER HALT' | decode_ms=94
+driver_halt: slot_pass=True | expected='Driver halt.' | heard='ER HALT' | decode_ms=94
+driver_halt: slot_pass=True | expected='Driver halt.' | heard='ER HALT' | decode_ms=88
+driver_halt: slot_pass=True | expected='Driver halt.' | heard='ER HALT' | decode_ms=98
+driver_halt: slot_pass=True | expected='Driver halt.' | heard='ER HALT' | decode_ms=96
+turn40_left: slot_pass=False | expected='Turn forty degrees left.' | heard='S LEFT' | decode_ms=142
+turn40_left: slot_pass=False | expected='Turn forty degrees left.' | heard='S LEFT' | decode_ms=134
+turn40_left: slot_pass=False | expected='Turn forty degrees left.' | heard='S LEFT' | decode_ms=136
+turn40_left: slot_pass=False | expected='Turn forty degrees left.' | heard='S LEFT' | decode_ms=141
+turn40_left: slot_pass=False | expected='Turn forty degrees left.' | heard='S LEFT' | decode_ms=141
+beta_do_not_fire: slot_pass=False | expected='Beta do not fire.' | heard='' | decode_ms=125
+beta_do_not_fire: slot_pass=False | expected='Beta do not fire.' | heard='' | decode_ms=130
+beta_do_not_fire: slot_pass=False | expected='Beta do not fire.' | heard='' | decode_ms=128
+beta_do_not_fire: slot_pass=False | expected='Beta do not fire.' | heard='' | decode_ms=133
+beta_do_not_fire: slot_pass=False | expected='Beta do not fire.' | heard='' | decode_ms=128
+
+ C:\Users\dclar\AppData\Local\RitsuCampaigns\shellshock-human-asr-20261025\repo\research\human-asr-benchmark\results\sensevoice.json
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='Turn 30 degrees to the right and run over that tree.' | decode_ms=227
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='Turn 30 degrees to the right and run over that tree.' | decode_ms=201
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='Turn 30 degrees to the right and run over that tree.' | decode_ms=207
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='Turn 30 degrees to the right and run over that tree.' | decode_ms=337
+turn30_right_tree: slot_pass=True | expected='Turn thirty degrees to the right and run over that tree.' | heard='Turn 30 degrees to the right and run over that tree.' | decode_ms=352
+driver_halt: slot_pass=False | expected='Driver halt.' | heard='Driver Holt.' | decode_ms=168
+driver_halt: slot_pass=False | expected='Driver halt.' | heard='Driver Holt.' | decode_ms=159
+driver_halt: slot_pass=False | expected='Driver halt.' | heard='Driver Holt.' | decode_ms=172
+driver_halt: slot_pass=False | expected='Driver halt.' | heard='Driver Holt.' | decode_ms=161
+driver_halt: slot_pass=False | expected='Driver halt.' | heard='Driver Holt.' | decode_ms=190
+turn40_left: slot_pass=True | expected='Turn forty degrees left.' | heard='Turn 40 degrees left.' | decode_ms=234
+turn40_left: slot_pass=True | expected='Turn forty degrees left.' | heard='Turn 40 degrees left.' | decode_ms=212
+turn40_left: slot_pass=True | expected='Turn forty degrees left.' | heard='Turn 40 degrees left.' | decode_ms=214
+turn40_left: slot_pass=True | expected='Turn forty degrees left.' | heard='Turn 40 degrees left.' | decode_ms=261
+turn40_left: slot_pass=True | expected='Turn forty degrees left.' | heard='Turn 40 degrees left.' | decode_ms=211
+beta_do_not_fire: slot_pass=True | expected='Beta do not fire.' | heard='Beta, do not fire.' | decode_ms=169
+beta_do_not_fire: slot_pass=True | expected='Beta do not fire.' | heard='Beta, do not fire.' | decode_ms=161
+beta_do_not_fire: slot_pass=True | expected='Beta do not fire.' | heard='Beta, do not fire.' | decode_ms=176
+beta_do_not_fire: slot_pass=True | expected='Beta do not fire.' | heard='Beta, do not fire.' | decode_ms=198
+beta_do_not_fire: slot_pass=True | expected='Beta do not fire.' | heard='Beta, do not fire.' | decode_ms=220

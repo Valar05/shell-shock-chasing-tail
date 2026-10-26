@@ -1,0 +1,205 @@
+{
+  "schema": "shellshock.human-asr-results.v1",
+  "rows": [
+    {
+      "case": "turn30_right_tree",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "engine": "zipformer",
+      "trial": 1,
+      "transcript": "N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE",
+      "decode_ms": 168,
+      "input_sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn30_right_tree",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "engine": "zipformer",
+      "trial": 2,
+      "transcript": "N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE",
+      "decode_ms": 164,
+      "input_sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn30_right_tree",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "engine": "zipformer",
+      "trial": 3,
+      "transcript": "N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE",
+      "decode_ms": 174,
+      "input_sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn30_right_tree",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "engine": "zipformer",
+      "trial": 4,
+      "transcript": "N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE",
+      "decode_ms": 166,
+      "input_sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn30_right_tree",
+      "expected": "Turn thirty degrees to the right and run over that tree.",
+      "engine": "zipformer",
+      "trial": 5,
+      "transcript": "N THIRTY DEGREES TO THE RIGHT AND RUN OVER THAT TREE",
+      "decode_ms": 181,
+      "input_sha256": "78e52bafcf015f090b79c84c7c76927389d867f4652db478e3d8d90a8b3b2fd2",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "driver_halt",
+      "expected": "Driver halt.",
+      "engine": "zipformer",
+      "trial": 1,
+      "transcript": "ER HALT",
+      "decode_ms": 94,
+      "input_sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "driver_halt",
+      "expected": "Driver halt.",
+      "engine": "zipformer",
+      "trial": 2,
+      "transcript": "ER HALT",
+      "decode_ms": 94,
+      "input_sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "driver_halt",
+      "expected": "Driver halt.",
+      "engine": "zipformer",
+      "trial": 3,
+      "transcript": "ER HALT",
+      "decode_ms": 88,
+      "input_sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "driver_halt",
+      "expected": "Driver halt.",
+      "engine": "zipformer",
+      "trial": 4,
+      "transcript": "ER HALT",
+      "decode_ms": 98,
+      "input_sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "driver_halt",
+      "expected": "Driver halt.",
+      "engine": "zipformer",
+      "trial": 5,
+      "transcript": "ER HALT",
+      "decode_ms": 96,
+      "input_sha256": "3d78745ded01017a4053b33bf64074a8c1b4fc783dd34d58293974624b30016e",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn40_left",
+      "expected": "Turn forty degrees left.",
+      "engine": "zipformer",
+      "trial": 1,
+      "transcript": "S LEFT",
+      "decode_ms": 142,
+      "input_sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn40_left",
+      "expected": "Turn forty degrees left.",
+      "engine": "zipformer",
+      "trial": 2,
+      "transcript": "S LEFT",
+      "decode_ms": 134,
+      "input_sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn40_left",
+      "expected": "Turn forty degrees left.",
+      "engine": "zipformer",
+      "trial": 3,
+      "transcript": "S LEFT",
+      "decode_ms": 136,
+      "input_sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn40_left",
+      "expected": "Turn forty degrees left.",
+      "engine": "zipformer",
+      "trial": 4,
+      "transcript": "S LEFT",
+      "decode_ms": 141,
+      "input_sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "turn40_left",
+      "expected": "Turn forty degrees left.",
+      "engine": "zipformer",
+      "trial": 5,
+      "transcript": "S LEFT",
+      "decode_ms": 141,
+      "input_sha256": "e56c2aa01fbd2b3acfd20a1187e49f86a6957357a42e2bbab4c6297e257b078f",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "beta_do_not_fire",
+      "expected": "Beta do not fire.",
+      "engine": "zipformer",
+      "trial": 1,
+      "transcript": "",
+      "decode_ms": 125,
+      "input_sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "beta_do_not_fire",
+      "expected": "Beta do not fire.",
+      "engine": "zipformer",
+      "trial": 2,
+      "transcript": "",
+      "decode_ms": 130,
+      "input_sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "beta_do_not_fire",
+      "expected": "Beta do not fire.",
+      "engine": "zipformer",
+      "trial": 3,
+      "transcript": "",
+      "decode_ms": 128,
+      "input_sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "beta_do_not_fire",
+      "expected": "Beta do not fire.",
+      "engine": "zipformer",
+      "trial": 4,
+      "transcript": "",
+      "decode_ms": 133,
+      "input_sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "source": "human-recorded PCM 16k"
+    },
+    {
+      "case": "beta_do_not_fire",
+      "expected": "Beta do not fire.",
+      "engine": "zipformer",
+      "trial": 5,
+      "transcript": "",
+      "decode_ms": 128,
+      "input_sha256": "1ca0fc0b9e13312ed2425211fbf94ea593312f0e5d3400d08c8a10879d802c0b",
+      "source": "human-recorded PCM 16k"
+    }
+  ]
+}
