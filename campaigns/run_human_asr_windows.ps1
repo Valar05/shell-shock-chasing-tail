@@ -5,7 +5,7 @@ $campaign='shellshock-human-voice-20261025'
 $root=Join-Path $env:TEMP ('ritsu-campaign-'+$campaign)
 if(Test-Path $root){throw "Existing campaign workspace; refuse overwrite: $root"}
 $zipName='shellshock-human-asr-benchmark.zip'
-$candidates=@('G:\My Drive\ShellShock-Human-ASR-Campaign-20261025\'+$zipName,'G:\ShellShock-Human-ASR-Campaign-20261025\'+$zipName)
+$candidates=@((Join-Path 'G:\My Drive\ShellShock-Human-ASR-Campaign-20261025' $zipName),(Join-Path 'G:\ShellShock-Human-ASR-Campaign-20261025' $zipName))
 $archive=$candidates|Where-Object{Test-Path $_}|Select-Object -First 1
 if(-not $archive){throw ('Drive ZIP not found at: '+($candidates -join ' | '))}
 $actual=(Get-FileHash -Algorithm SHA256 -LiteralPath $archive).Hash.ToLowerInvariant()
